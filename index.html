@@ -112,6 +112,24 @@
   #guideList .r3 .s { color: #f59e0b; }
   #guideList .r4 .s { color: #ef4444; }
   #guideList .r5 .s { color: #a855f7; }
+  .stats { display: flex; align-items: center; gap: 18px; }
+  #score { display: inline-block; color: var(--ink); font-weight: 600; }
+  #score.bump { animation: bump .4s ease-out; }
+  @keyframes bump { 0% { transform: scale(1.6); } 100% { transform: scale(1); } }
+  .result {
+    position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; background: rgba(250,250,250,.88); backdrop-filter: blur(3px);
+  }
+  .result[hidden] { display: none; }
+  .res-icon { color: var(--ink); }
+  .res-score { font-size: 56px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .res-line { font-size: 15px; font-weight: 600; }
+  .res-line.new { color: #a855f7; }
+  .res-why { font-size: 12.5px; color: var(--sub); padding: 0 24px; text-align: center; }
+  #again { margin-top: 12px; }
+  #log .p { margin-left: auto; color: var(--sub); font-variant-numeric: tabular-nums; }
+  #log li.r5 .p { color: #aaa; }
+  #guideList .pts { margin-left: auto; font-weight: 600; color: var(--sub); font-variant-numeric: tabular-nums; }
   .note[hidden] { display: none; }
   .note { position: absolute; inset: 0; display: grid; place-items: center; color: var(--sub); pointer-events: none; }
 </style>
@@ -126,11 +144,22 @@
     </div>
     <div class="hintrow"><p class="hint" id="hint"></p><span class="count" id="count"></span></div>
     <div class="stage">
-      <div id="life" role="img" aria-label="Game of Life"></div>
+      <div id="life" role="img" aria-label="Game of Life">
+        <div class="result" id="result" hidden>
+          <div class="res-icon" id="resIcon"></div>
+          <div class="res-score" id="resScore"></div>
+          <div class="res-line" id="resLine"></div>
+          <div class="res-why" id="resWhy"></div>
+          <button id="again" class="ghost icon"></button>
+        </div>
+      </div>
       <div class="note" id="note"></div>
     </div>
     <div class="bar">
-      <span class="gen" id="genbox"><span id="genicon"></span><span id="gen">0</span></span>
+      <span class="stats">
+        <span class="gen" id="genbox"><span id="genicon"></span><span id="gen">0</span></span>
+        <span class="gen" id="scorebox"><span id="scoreicon"></span><span id="score">0</span></span>
+      </span>
       <span class="btns">
         <button id="cls" class="ghost icon"></button>
         <button id="guideBtn" class="ghost icon"></button>
@@ -546,7 +575,8 @@ function load(cells, n, asGhost = false) {
   tint = new Uint8Array(n * n);
   animateCells(0, true);
   gen = 0; clearFx(); logEl.replaceChildren(); entries = []; draw();
-  if (!asGhost) detect(true);                          // a preview is not a game: no pattern log, no effects
+  resetScore();
+  if (!asGhost) { detect(true); seenStates.set(stateKey(), 0); }   // a preview is not a game: no pattern log, no effects
 }
 
 /* ===================== Sound ===================== */
@@ -838,6 +868,62 @@ function step() {
   [cur, nxt] = [nxt, cur];
   gen++;
   detect();
+  if (gen >= GAME_GENS) finish("limit");
+  else {
+    const k = stateKey();
+    if (seenStates.has(k)) finish("settled");            // back to an earlier state: stuck in a cycle for good
+    else seenStates.set(k, gen);
+  }
+}
+
+/* ---- scoring ---- */
+// Every new appearance of a pattern scores points by its rank: 1, 3, 9, 27, 81. The ranks are a ladder in which each
+// step is about 3x rarer (see PATTERNS), so each rank is worth about the same in total and hunting for rare patterns
+// pays. A game ends after GAME_GENS generations, or earlier once the board repeats a state it has already been in
+// (it is then stuck in a cycle and nothing new can ever appear). The game is deterministic: the same text on the same
+// class always gives the same score, so the way to score higher is to find a better text.
+const POINTS = [0, 1, 3, 9, 27, 81];
+const GAME_GENS = 1000;
+let score = 0, finished = false, resultInfo = null;
+const seenStates = new Map();
+function stateKey() {
+  let h = 2166136261, pop = 0;
+  for (let i = 0; i < cur.length; i++) { h = Math.imul(h ^ cur[i], 16777619); pop += cur[i]; }
+  return (h >>> 0).toString(36) + ":" + pop;
+}
+function resetScore() {
+  score = 0; finished = false; resultInfo = null;
+  seenStates.clear();
+  $("score").textContent = 0;
+  renderResult();
+}
+function addScore(points) {
+  score += points;
+  const el = $("score");
+  el.textContent = score;
+  el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump");   // restart the little pop animation
+}
+function finish(reason) {
+  finished = true; running = false; holding = false;
+  const key = "qrlife-best-" + boardClass;
+  let prev = 0;
+  try { prev = +localStorage.getItem(key) || 0; } catch (e) { /* storage unavailable */ }
+  const isBest = score > prev;
+  if (isBest) { try { localStorage.setItem(key, score); } catch (e) { /* ignore */ } }
+  resultInfo = { score, best: Math.max(prev, score), isBest, reason, gen };
+  renderResult();
+  syncButtons();
+  playRank(isBest ? 5 : 3);
+}
+function renderResult() {
+  const box = $("result"), t = T();
+  box.hidden = !resultInfo;
+  if (!resultInfo) return;
+  $("resScore").textContent = resultInfo.score;
+  const line = $("resLine");
+  line.textContent = resultInfo.isBest ? t.newBest : t.best(resultInfo.best);
+  line.classList.toggle("new", resultInfo.isBest);
+  $("resWhy").textContent = resultInfo.reason === "limit" ? t.endLimit(GAME_GENS) : t.endSettled(resultInfo.gen);
 }
 
 /* ---- famous patterns ---- */
@@ -970,6 +1056,7 @@ function detect(silent = false) {
       if (it.rank >= 5) it.glow = makeGlow(it);
       next.push(it);
       added[it.name] = (added[it.name] || 0) + 1;
+      addScore(POINTS[it.rank]);
       if (!silent) celebrate(it);
     }
   }
@@ -995,6 +1082,8 @@ const I18N = {
     pause: "Pause", resume: "Resume", restart: "Restart", lang: "Language",
     logLabel: "Detected patterns", logEmpty: "Patterns you find will appear here",
     guide: "Pattern guide", close: "Close",
+    score: "Score", best: n => `Best ${n}`, newBest: "New best!", replay: "Replay",
+    endLimit: n => `${n} generations played`, endSettled: g => `Settled at generation ${g}: nothing new can appear`,
     classSmall: "Small board", classLarge: "Large board", upTo: n => `up to ${n} bytes`,
     rarity: r => `Rarity ${r} / 5`,
     names: { block: "Block", beehive: "Beehive", loaf: "Loaf", boat: "Boat", ship: "Ship", tub: "Tub", pond: "Pond",
@@ -1013,6 +1102,8 @@ const I18N = {
     pause: "一時停止", resume: "再開", restart: "最初から", lang: "言語",
     logLabel: "検出したパターン", logEmpty: "見つけたパターンがここに表示されます",
     guide: "パターン一覧", close: "閉じる",
+    score: "得点", best: n => `ベスト ${n}`, newBest: "ベスト更新！", replay: "もう一度見る",
+    endLimit: n => `${n}世代まで到達`, endSettled: g => `${g}世代で盤面が落ち着きました（もう新しいパターンは出ません）`,
     classSmall: "小さい盤面", classLarge: "大きい盤面", upTo: n => `最大 ${n} バイト`,
     rarity: r => `レア度 ${r} / 5`,
     names: { block: "ブロック", beehive: "ビーハイブ", loaf: "ローフ", boat: "ボート", ship: "シップ", tub: "タブ", pond: "ポンド",
@@ -1043,6 +1134,7 @@ const ICON = {
       r += `<rect x="${2 + x * (cell + gap)}" y="${2 + y * (cell + gap)}" width="${cell}" height="${cell}" rx="${cell * 0.2}"/>`;
     return svg(`<g fill="currentColor" stroke="none">${r}</g>`, size);
   },
+  trophy: size => svg('<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4"/><path d="M12 13v4M8 20h8M10 17h4"/>', size),
   book: size => svg('<path d="M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2z"/><path d="M4 20a2 2 0 0 1 2-2h13v3H6a2 2 0 0 1-2-1z"/><path d="M9 7.5h6"/>', size),
   close: size => svg('<path d="M6 6l12 12M18 6L6 18"/>', size),
   globe: size => svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.8 2.5 4 5.6 4 9s-1.2 6.5-4 9c-2.8-2.5-4-5.6-4-9s1.2-6.5 4-9z"/>', size),
@@ -1060,7 +1152,8 @@ let entries = [];
 function fillLogItem(e) {
   e.li.innerHTML = `<span class="g">${ICON.glider(12)}${e.gen}</span>` +
     `<span class="s" title="${T().rarity(e.rank)}">${"★".repeat(e.rank)}<i>${"★".repeat(5 - e.rank)}</i></span>` +
-    `<span class="n">${patName(e.id)}</span>${e.count > 1 ? `<span class="g">×${e.count}</span>` : ""}`;
+    `<span class="n">${patName(e.id)}</span>${e.count > 1 ? `<span class="g">×${e.count}</span>` : ""}` +
+    `<span class="p">+${POINTS[e.rank] * e.count}</span>`;
 }
 function log(id, count) {
   const rank = rankOf(id), li = document.createElement("li");
@@ -1085,7 +1178,8 @@ function syncButtons() {
   toggleBtn.innerHTML = running ? ICON.pause() : ICON.play();
   toggleBtn.title = running ? t.pause : t.resume;
   toggleBtn.setAttribute("aria-label", toggleBtn.title);
-  toggleBtn.disabled = resetBtn.disabled = !hasQR;
+  toggleBtn.disabled = !hasQR || finished;
+  resetBtn.disabled = !hasQR;
 }
 function classLabel() {
   const t = T(), n = boardSize();
@@ -1121,7 +1215,8 @@ function renderGuide() {
     .sort((a, b) => b.rank - a.rank || a.i - b.i)
     .map(e => `<li class="r${e.rank}"><div class="thumb">${patternSVG(e.art, RANK_COLORS[e.rank])}</div>` +
       `<div class="info"><span class="n">${patName(e.id)}</span>` +
-      `<span class="s" title="${t.rarity(e.rank)}">${"★".repeat(e.rank)}<i>${"★".repeat(5 - e.rank)}</i></span></div></li>`)
+      `<span class="s" title="${t.rarity(e.rank)}">${"★".repeat(e.rank)}<i>${"★".repeat(5 - e.rank)}</i></span></div>` +
+      `<span class="pts">+${POINTS[e.rank]}</span></li>`)
     .join("");
 }
 
@@ -1137,6 +1232,13 @@ function applyLang() {
   life.setAttribute("aria-label", t.board);
   $("genicon").innerHTML = ICON.glider(16);
   $("genbox").title = t.gen;
+  $("scoreicon").innerHTML = ICON.trophy(16);
+  $("scorebox").title = t.score;
+  $("resIcon").innerHTML = ICON.trophy(40);
+  $("again").innerHTML = ICON.restart();
+  $("again").title = t.replay;
+  $("again").setAttribute("aria-label", t.replay);
+  renderResult();
   resetBtn.innerHTML = ICON.restart();
   resetBtn.title = t.restart;
   resetBtn.setAttribute("aria-label", t.restart);
@@ -1268,6 +1370,7 @@ text.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); start(); }
 });
 goBtn.onclick = start;
+$("again").onclick = () => { audioWake(); load(seed, N); holding = false; running = true; syncButtons(); };
 clsBtn.onclick = () => {                              // switch class: the board and its limits change, so re-preview
   const names = Object.keys(BOARD_CLASSES);
   boardClass = names[(names.indexOf(boardClass) + 1) % names.length];
