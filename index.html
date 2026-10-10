@@ -108,7 +108,6 @@
       <span class="gen" id="genbox"><span id="genicon"></span><span id="gen">0</span></span>
       <span class="btns">
         <button id="lang" class="ghost lang"></button>
-        <button id="view" class="ghost icon" aria-pressed="true"></button>
         <button id="snd" class="ghost icon" aria-pressed="true"></button>
         <button id="toggle" class="ghost icon" disabled></button>
         <button id="reset" class="ghost icon" disabled></button>
@@ -422,68 +421,6 @@ const TINT = RANK_COLORS.map(h => new THREE.Color(h));
 let mesh = null, cellScale = new Float32Array(0);   // cellScale: 0..1 animated size of each cell
 let tint = new Uint8Array(0);                        // 0 = plain, 1..5 = part of a detected pattern of that rank
 
-// ---- droplet view: living cells are metaballs, drawn by a fragment shader ----
-// Every live cell adds a smooth bump to a field; where the field passes a threshold there is "water".
-// Neighbouring cells overlap and fuse into one drop, isolated cells stay round. Drops are flat-coloured (2D look).
-// The board wraps, so drops also fuse across the edges of the world.
-let dropletOn = true;
-try { dropletOn = localStorage.getItem("qrlife-view") !== "cells"; } catch (e) { /* storage unavailable */ }
-const dropMat = new THREE.ShaderMaterial({
-  uniforms: { uCells: { value: null }, uN: { value: 1 } },
-  transparent: true,
-  depthWrite: false,
-  vertexShader: `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }`,
-  fragmentShader: `
-    uniform sampler2D uCells;          // per cell: rgb = pattern colour, a = how alive (0..1, animated)
-    uniform float uN;
-    varying vec2 vUv;
-    const float R = 1.5;               // reach of one cell, in cells
-    const float T = 0.75;              // field level of the water surface
-    void main() {
-      int n = int(uN);
-      vec2 p = vec2(vUv.x, 1.0 - vUv.y) * uN;           // board coordinates, y down
-      ivec2 c0 = ivec2(floor(p));
-      float f = 0.0, wsum = 0.0;
-      vec3 col = vec3(0.0);
-      for (int oy = -2; oy <= 2; oy++) {
-        for (int ox = -2; ox <= 2; ox++) {
-          ivec2 c = c0 + ivec2(ox, oy);
-          vec4 d = texelFetch(uCells, ivec2((c.x + n) % n, (c.y + n) % n), 0);
-          if (d.a <= 0.001) continue;
-          vec2 r = p - (vec2(c) + 0.5);
-          float q = dot(r, r) / (R * R);
-          if (q >= 1.0) continue;
-          float k = 1.0 - q;
-          float w = d.a * k * k * k;                     // smooth bump (1 - q)^3
-          f += w;
-          col += d.rgb * w;
-          wsum += w;
-        }
-      }
-      float e = max(fwidth(f), 1e-4);
-      float a = smoothstep(T - e, T + e, f);             // anti-aliased edge of the drop
-      if (a <= 0.0) discard;
-      vec3 base = col / max(wsum, 1e-4);                 // colours of fused cells blend
-      gl_FragColor = vec4(base, a);
-      #include <colorspace_fragment>
-    }`,
-});
-const dropMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), dropMat);
-dropMesh.rotation.x = -Math.PI / 2;
-dropMesh.position.y = 0.5;
-scene.add(dropMesh);
-let cellTex = null;                                      // N x N float texture feeding the shader
-
-function applyView() {
-  if (mesh) mesh.visible = !dropletOn;
-  dropMesh.visible = dropletOn;
-}
-
 let viewAspect = 1;
 // the visible area is the whole board plus a small margin, whatever the shape of the box
 function fitCamera() {
@@ -514,13 +451,6 @@ function buildGrid(n) {
   mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * n * 3), 3);
   mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
   scene.add(mesh);
-  if (cellTex) cellTex.dispose();
-  cellTex = new THREE.DataTexture(new Float32Array(n * n * 4), n, n, THREE.RGBAFormat, THREE.FloatType);
-  cellTex.minFilter = cellTex.magFilter = THREE.NearestFilter;
-  dropMat.uniforms.uCells.value = cellTex;
-  dropMat.uniforms.uN.value = n;
-  dropMesh.scale.set(n, n, 1);
-  applyView();
   layoutWorldEdge(n);
   floor.scale.set(n * 10, n * 10, 1);                  // same colour as the page: reads as an endless floor
   controls.minZoom = 0.6;                              // wheel zoom range (1 = the whole board)
@@ -542,8 +472,8 @@ renderer.domElement.addEventListener("dblclick", resetView);
 // ease every cell toward alive(1) / dead(0) and its pattern colour, and write its transform
 function animateCells(dt, force = false) {
   if (!mesh) return;
-  const k = 1 - Math.exp(-dt * (dropletOn ? 14 : 30)), kc = 1 - Math.exp(-dt * 20);   // drops morph more slowly than cubes
-  const a = mesh.instanceMatrix.array, c = mesh.instanceColor.array, o = N / 2 - 0.5, td = cellTex.image.data;
+  const k = 1 - Math.exp(-dt * 30), kc = 1 - Math.exp(-dt * 20);
+  const a = mesh.instanceMatrix.array, c = mesh.instanceColor.array, o = N / 2 - 0.5;
   let dirty = false, cDirty = false;
   for (let i = 0; i < N * N; i++) {
     const t = cur[i];
@@ -569,11 +499,9 @@ function animateCells(dt, force = false) {
       if (Math.abs(dr) + Math.abs(dg) + Math.abs(db) < 0.004) { c[j3] = tc.r; c[j3 + 1] = tc.g; c[j3 + 2] = tc.b; }
       cDirty = true;
     }
-    td[i * 4] = c[j3]; td[i * 4 + 1] = c[j3 + 1]; td[i * 4 + 2] = c[j3 + 2]; td[i * 4 + 3] = s;
   }
   if (dirty) mesh.instanceMatrix.needsUpdate = true;
   if (cDirty) mesh.instanceColor.needsUpdate = true;
-  if (dirty || cDirty) cellTex.needsUpdate = true;
 }
 
 function load(cells, n) {
@@ -1010,7 +938,7 @@ const I18N = {
     tooLong: n => `Too long (max ${n} bytes)`,
     note: "Type something, then press ↵",
     board: "Game of Life", zoom: "Scroll to zoom · double-click to reset",
-    gen: "Generation", soundOn: "Sound on", soundOff: "Sound off", viewDrop: "Droplet view", viewCells: "Cell view",
+    gen: "Generation", soundOn: "Sound on", soundOff: "Sound off",
     pause: "Pause", resume: "Resume", restart: "Restart", lang: "Language",
     logLabel: "Detected patterns", logEmpty: "Patterns you find will appear here",
     rarity: r => `Rarity ${r} / 5`,
@@ -1024,7 +952,7 @@ const I18N = {
     tooLong: n => `長すぎます（最大 ${n} バイト）`,
     note: "入力して ↵ で開始",
     board: "ライフゲーム", zoom: "ホイールで拡大縮小 · ダブルクリックで元に戻す",
-    gen: "世代", soundOn: "音あり", soundOff: "音なし", viewDrop: "水滴表示", viewCells: "セル表示",
+    gen: "世代", soundOn: "音あり", soundOff: "音なし",
     pause: "一時停止", resume: "再開", restart: "最初から", lang: "言語",
     logLabel: "検出したパターン", logEmpty: "見つけたパターンがここに表示されます",
     rarity: r => `レア度 ${r} / 5`,
@@ -1045,15 +973,13 @@ const ICON = {
   pause: size => svg('<rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/>', size),
   restart: size => svg('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v5h5"/>', size),
   soundOn: size => svg(SPK + '<path d="M15.5 9a4.5 4.5 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/>', size),
-  drop: size => svg('<path d="M12 3c3.6 4.3 6 7.3 6 10.5a6 6 0 0 1-12 0C6 10.3 8.4 7.3 12 3z" fill="currentColor"/>', size),
-  cells: size => svg('<g fill="currentColor" stroke="none"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></g>', size),
   soundOff: size => svg(SPK + '<path d="M16 9.5l5 5M21 9.5l-5 5"/>', size),
   globe: size => svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.8 2.5 4 5.6 4 9s-1.2 6.5-4 9c-2.8-2.5-4-5.6-4-9s1.2-6.5 4-9z"/>', size),
   // the Life "glider": stands for "generation"
   glider: size => svg('<g fill="currentColor" stroke="none"><rect x="9" y="2" width="6" height="6" rx="1"/><rect x="16" y="9" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/></g>', size),
 };
 
-const goBtn = $("go"), hint = $("hint"), toggleBtn = $("toggle"), resetBtn = $("reset"), sndBtn = $("snd"), langBtn = $("lang"), viewBtn = $("view");
+const goBtn = $("go"), hint = $("hint"), toggleBtn = $("toggle"), resetBtn = $("reset"), sndBtn = $("snd"), langBtn = $("lang");
 let pending = null;                  // QR of the text now in the box (null: empty or too long)
 let hintState = { tooLong: 0 };      // tooLong: the byte limit to show, or 0
 
@@ -1090,13 +1016,6 @@ function syncButtons() {
   toggleBtn.setAttribute("aria-label", toggleBtn.title);
   toggleBtn.disabled = resetBtn.disabled = !hasQR;
 }
-function syncView() {
-  const t = T();
-  viewBtn.innerHTML = dropletOn ? ICON.drop() : ICON.cells();
-  viewBtn.title = dropletOn ? t.viewDrop : t.viewCells;
-  viewBtn.setAttribute("aria-label", viewBtn.title);
-  viewBtn.setAttribute("aria-pressed", dropletOn);
-}
 function syncSound() {
   const t = T();
   sndBtn.innerHTML = soundOn ? ICON.soundOn() : ICON.soundOff();
@@ -1130,7 +1049,6 @@ function applyLang() {
   renderHint();
   syncButtons();
   syncSound();
-  syncView();
 }
 
 /* ---- input -> QR preview -> start ---- */
@@ -1188,12 +1106,6 @@ text.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); start(); }
 });
 goBtn.onclick = start;
-viewBtn.onclick = () => {
-  dropletOn = !dropletOn;
-  try { localStorage.setItem("qrlife-view", dropletOn ? "drop" : "cells"); } catch (e) { /* ignore */ }
-  applyView();
-  syncView();
-};
 sndBtn.onclick = () => {
   soundOn = !soundOn;
   try { localStorage.setItem("qrlife-sound", soundOn ? "on" : "off"); } catch (e) { /* ignore */ }
