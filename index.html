@@ -43,7 +43,7 @@
   .hintrow { display: flex; justify-content: space-between; gap: 12px; margin: 8px 4px 0; }
   .hint { margin: 0; font-size: 12.5px; color: var(--sub); }
   .count { flex: none; font-size: 12.5px; color: var(--sub); font-variant-numeric: tabular-nums; }
-  .count.over { color: var(--ink); font-weight: 600; }
+  .count.over, .count.full { color: var(--ink); font-weight: 600; }
   .hint.err { color: var(--ink); font-weight: 600; }
   .stage { position: relative; margin-top: 12px; }
   #life {
@@ -1176,7 +1176,7 @@ function preview() {
   hintState.tooLong = 0;
   const max = QR.maxBytes(qrVersion(), 1);
   countEl.textContent = `${bytes.length} / ${max}`;
-  countEl.classList.toggle("over", bytes.length > max);
+  countEl.classList.toggle("full", bytes.length >= max);
   if (!bytes.length) {
     qrCanvas.width = qrCanvas.height = 1;
     c.fillStyle = "#fff"; c.fillRect(0, 0, 1, 1);
@@ -1227,7 +1227,42 @@ function frame(t) {
   renderer.render(scene, camera);
 }
 
-text.addEventListener("input", preview);
+// The box takes no more than the class's byte limit: whatever would go over (typing, paste, drop, a committed IME
+// conversion) is cut at a character boundary and only the part that fits goes in. If the text is already over the limit
+// (after switching to a smaller class) nothing can be added, but it can still be deleted or replaced by something shorter.
+let lastValue = text.value;
+const byteLen = str => enc.encode(str).length;
+function enforceLimit() {
+  const max = QR.maxBytes(qrVersion(), 1), now = text.value;
+  if (byteLen(now) <= max || byteLen(now) <= byteLen(lastValue)) return;           // fits, or the edit did not add bytes
+  // find what this edit changed: common prefix / suffix with the previous value
+  let a = 0;
+  while (a < lastValue.length && a < now.length && lastValue[a] === now[a]) a++;
+  let b = 0;
+  while (b < lastValue.length - a && b < now.length - a && lastValue[lastValue.length - 1 - b] === now[now.length - 1 - b]) b++;
+  const isHigh = c => c >= 0xd800 && c <= 0xdbff, isLow = c => c >= 0xdc00 && c <= 0xdfff;
+  if (a && isHigh(now.charCodeAt(a - 1))) a--;                                       // do not cut inside an emoji etc.
+  if (b && isLow(now.charCodeAt(now.length - b))) b--;
+  const head = now.slice(0, a), tail = now.slice(now.length - b), inserted = now.slice(a, now.length - b);
+  const removed = lastValue.slice(a, lastValue.length - b);
+  let room = max - (byteLen(lastValue) - byteLen(removed));                          // bytes the inserted part may use
+  let kept = "";
+  for (const ch of inserted) {                                                       // by whole characters
+    const n = byteLen(ch);
+    if (n > room) break;
+    kept += ch; room -= n;
+  }
+  text.value = head + kept + tail;
+  const caret = (head + kept).length;
+  text.setSelectionRange(caret, caret);
+}
+function onTextChanged() {
+  enforceLimit();
+  lastValue = text.value;
+  preview();
+}
+text.addEventListener("input", e => { if (e.isComposing) preview(); else onTextChanged(); });
+text.addEventListener("compositionend", onTextChanged);
 text.addEventListener("keydown", e => {
   // Enter while an IME is converting text only confirms the conversion
   if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); start(); }
