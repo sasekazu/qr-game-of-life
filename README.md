@@ -7,5 +7,5 @@ Type some text and its QR code plays Conway's Game of Life.
 
 - Type up to 14 bytes (small board) or 106 bytes (large board), then press ↵ Enter or ▶.
 - Famous patterns (glider, pulsar, …) are detected and given a rarity rank of ★1–★5.
-- Every new pattern scores points by its rank (1 / 3 / 9 / 27 / 81). A game lasts 1000 generations.
+- Every new pattern scores points by its rank (1 / 3 / 9 / 27 / 81). A game lasts 1000 generations, or ends earlier once the board only repeats itself.
 - One file, no build: `index.html` (Three.js is loaded from a CDN).
