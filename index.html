@@ -87,6 +87,28 @@
   #log li.r5 { background: var(--ink); color: #fff; border-radius: 6px; margin: 2px 0; padding: 0 8px; }
   #log li.r5 .g { color: #aaa; }
   #log li.r5 .s i { color: #555; }
+  dialog {
+    border: 0; border-radius: 20px; padding: 0; width: min(92vw, 460px); max-height: 82vh;
+    color: var(--ink); background: var(--card);
+    box-shadow: 0 2px 4px rgba(0,0,0,.06), 0 24px 64px rgba(0,0,0,.25);
+  }
+  dialog[open] { display: flex; flex-direction: column; }
+  dialog::backdrop { background: rgba(17,17,17,.35); }
+  .guide-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 14px 6px 22px; }
+  .guide-head h2 { margin: 0; font-size: 15px; letter-spacing: .04em; }
+  #guideList { list-style: none; margin: 0; padding: 4px 14px 16px; overflow-y: auto; }
+  #guideList li { display: flex; align-items: center; gap: 16px; padding: 10px 6px; border-top: 1px solid var(--line); }
+  #guideList li:first-child { border-top: 0; }
+  #guideList .thumb { width: 72px; height: 72px; flex: none; display: grid; place-items: center; background: #f4f4f4; border-radius: 12px; }
+  #guideList .info { display: flex; flex-direction: column; gap: 2px; font-size: 15px; }
+  #guideList .r4 .n, #guideList .r5 .n { font-weight: 700; }
+  #guideList .s { letter-spacing: .12em; font-size: 14px; }
+  #guideList .s i { font-style: normal; color: var(--line); }
+  #guideList .r1 .s { color: #3b82f6; }
+  #guideList .r2 .s { color: #10b981; }
+  #guideList .r3 .s { color: #f59e0b; }
+  #guideList .r4 .s { color: #ef4444; }
+  #guideList .r5 .s { color: #a855f7; }
   .note[hidden] { display: none; }
   .note { position: absolute; inset: 0; display: grid; place-items: center; color: var(--sub); pointer-events: none; }
 </style>
@@ -107,6 +129,7 @@
     <div class="bar">
       <span class="gen" id="genbox"><span id="genicon"></span><span id="gen">0</span></span>
       <span class="btns">
+        <button id="guideBtn" class="ghost icon"></button>
         <button id="lang" class="ghost lang"></button>
         <button id="snd" class="ghost icon" aria-pressed="true"></button>
         <button id="toggle" class="ghost icon" disabled></button>
@@ -115,6 +138,11 @@
     </div>
     <ul id="log"></ul>
   </main>
+
+  <dialog id="guide">
+    <div class="guide-head"><h2 id="guideTitle"></h2><button id="guideClose" class="ghost icon"></button></div>
+    <ul id="guideList"></ul>
+  </dialog>
 
 <script type="importmap">
 { "imports": {
@@ -945,6 +973,7 @@ const I18N = {
     gen: "Generation", soundOn: "Sound on", soundOff: "Sound off",
     pause: "Pause", resume: "Resume", restart: "Restart", lang: "Language",
     logLabel: "Detected patterns", logEmpty: "Patterns you find will appear here",
+    guide: "Pattern guide", close: "Close",
     rarity: r => `Rarity ${r} / 5`,
     names: { block: "Block", beehive: "Beehive", loaf: "Loaf", boat: "Boat", ship: "Ship", tub: "Tub", pond: "Pond",
              blinker: "Blinker", toad: "Toad", beacon: "Beacon", pulsar: "Pulsar", glider: "Glider", lwss: "Lightweight spaceship" },
@@ -959,6 +988,7 @@ const I18N = {
     gen: "世代", soundOn: "音あり", soundOff: "音なし",
     pause: "一時停止", resume: "再開", restart: "最初から", lang: "言語",
     logLabel: "検出したパターン", logEmpty: "見つけたパターンがここに表示されます",
+    guide: "パターン一覧", close: "閉じる",
     rarity: r => `レア度 ${r} / 5`,
     names: { block: "ブロック", beehive: "ビーハイブ", loaf: "ローフ", boat: "ボート", ship: "シップ", tub: "タブ", pond: "ポンド",
              blinker: "ブリンカー", toad: "ヒキガエル", beacon: "ビーコン", pulsar: "パルサー", glider: "グライダー", lwss: "軽量宇宙船" },
@@ -978,12 +1008,14 @@ const ICON = {
   restart: size => svg('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v5h5"/>', size),
   soundOn: size => svg(SPK + '<path d="M15.5 9a4.5 4.5 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/>', size),
   soundOff: size => svg(SPK + '<path d="M16 9.5l5 5M21 9.5l-5 5"/>', size),
+  book: size => svg('<path d="M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2z"/><path d="M4 20a2 2 0 0 1 2-2h13v3H6a2 2 0 0 1-2-1z"/><path d="M9 7.5h6"/>', size),
+  close: size => svg('<path d="M6 6l12 12M18 6L6 18"/>', size),
   globe: size => svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.8 2.5 4 5.6 4 9s-1.2 6.5-4 9c-2.8-2.5-4-5.6-4-9s1.2-6.5 4-9z"/>', size),
   // the Life "glider": stands for "generation"
   glider: size => svg('<g fill="currentColor" stroke="none"><rect x="9" y="2" width="6" height="6" rx="1"/><rect x="16" y="9" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/></g>', size),
 };
 
-const goBtn = $("go"), hint = $("hint"), toggleBtn = $("toggle"), resetBtn = $("reset"), sndBtn = $("snd"), langBtn = $("lang");
+const goBtn = $("go"), hint = $("hint"), toggleBtn = $("toggle"), resetBtn = $("reset"), sndBtn = $("snd"), langBtn = $("lang"), guideBtn = $("guideBtn"), guide = $("guide"), guideList = $("guideList");
 let pending = null;                  // QR of the text now in the box (null: empty or too long)
 let hintState = { tooLong: 0 };      // tooLong: the byte limit to show, or 0
 
@@ -1028,6 +1060,27 @@ function syncSound() {
   sndBtn.setAttribute("aria-pressed", soundOn);
 }
 // (re)writes every piece of text and every icon for the current language
+// the pattern guide: rarest first, each with a picture of the pattern (its first phase), its rank colour and name
+function patternSVG(art, color) {
+  const rows = art.split("/"), h = rows.length, w = rows[0].length, sc = Math.min(12, 72 / Math.max(w, h));
+  let cells = "";
+  rows.forEach((row, y) => [...row].forEach((ch, x) => {
+    if (ch === "O") cells += `<rect x="${x + 0.06}" y="${y + 0.06}" width="0.88" height="0.88" rx="0.15"/>`;
+  }));
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w * sc}" height="${h * sc}" fill="${color}" aria-hidden="true">${cells}</svg>`;
+}
+function renderGuide() {
+  const t = T();
+  $("guideTitle").textContent = t.guide;
+  guideList.innerHTML = PATTERNS
+    .map((pt, i) => ({ id: pt[0], rank: pt[1], art: pt[3], i }))
+    .sort((a, b) => b.rank - a.rank || a.i - b.i)
+    .map(e => `<li class="r${e.rank}"><div class="thumb">${patternSVG(e.art, RANK_COLORS[e.rank])}</div>` +
+      `<div class="info"><span class="n">${patName(e.id)}</span>` +
+      `<span class="s" title="${t.rarity(e.rank)}">${"★".repeat(e.rank)}<i>${"★".repeat(5 - e.rank)}</i></span></div></li>`)
+    .join("");
+}
+
 function applyLang() {
   const t = T();
   document.documentElement.lang = lang;
@@ -1047,6 +1100,13 @@ function applyLang() {
   langBtn.innerHTML = ICON.globe(18) + `<span>${t.label}</span>`;
   langBtn.title = t.lang;
   langBtn.setAttribute("aria-label", t.lang);
+  guideBtn.innerHTML = ICON.book();
+  guideBtn.title = t.guide;
+  guideBtn.setAttribute("aria-label", t.guide);
+  $("guideClose").innerHTML = ICON.close();
+  $("guideClose").title = t.close;
+  $("guideClose").setAttribute("aria-label", t.close);
+  renderGuide();
   logEl.setAttribute("aria-label", t.logLabel);
   logEl.dataset.empty = t.logEmpty;
   entries.forEach(fillLogItem);
@@ -1127,6 +1187,9 @@ text.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); start(); }
 });
 goBtn.onclick = start;
+guideBtn.onclick = () => guide.showModal();
+$("guideClose").onclick = () => guide.close();
+guide.addEventListener("click", e => { if (e.target === guide) guide.close(); });   // click on the backdrop
 sndBtn.onclick = () => {
   soundOn = !soundOn;
   try { localStorage.setItem("qrlife-sound", soundOn ? "on" : "off"); } catch (e) { /* ignore */ }
