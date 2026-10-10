@@ -813,25 +813,35 @@ function tickGlows(dt) {
   }
 }
 
-function showLabel(name, x, z, rank) {
+// The name sits just outside the pattern, above it (or below when there is no room above), and only ever drifts
+// further away, so the text never covers the pattern it names.
+function showLabel(name, x, z, rank, size) {
   camera.updateMatrixWorld();
-  const v = new THREE.Vector3(x, 1, z).project(camera);
+  const W = life.clientWidth, H = life.clientHeight, half = size / 2 + 0.7;          // 0.7: the cell's own half size + a little air
+  const project = (px, pz) => {                                                     // world -> pixels inside the board box
+    const v = new THREE.Vector3(px, 1, pz).project(camera);
+    return [(v.x * 0.5 + 0.5) * W, (-v.y * 0.5 + 0.5) * H];
+  };
   const el = document.createElement("div");
   el.className = "fx-label";
   el.textContent = name;
-  el.style.left = Math.min(80, Math.max(20, (v.x * 0.5 + 0.5) * 100)) + "%";
-  el.style.top = Math.min(88, Math.max(12, (-v.y * 0.5 + 0.5) * 100)) + "%";
   el.style.borderColor = RANK_COLORS[rank];
   life.appendChild(el);
-  const still = "translate(-50%,-110%)";
-  el.animate(REDUCED_MOTION ? [                                         // no movement for "reduce motion": it only fades
-    { opacity: 0, transform: still }, { opacity: 1, transform: still, offset: 0.15 },
-    { opacity: 1, transform: still, offset: 0.75 }, { opacity: 0, transform: still },
+  const w = el.offsetWidth, h = el.offsetHeight, gap = 6;
+  const [cx, topY] = project(x, z - half), botY = project(x, z + half)[1];            // the pattern's top / bottom edge on screen
+  const above = topY - gap - h >= 4;
+  el.style.left = Math.min(W - w / 2 - 4, Math.max(w / 2 + 4, cx)) + "px";
+  el.style.top = (above ? topY - gap : botY + gap) + "px";
+  const base = above ? "translate(-50%,-100%)" : "translate(-50%,0)";
+  const away = above ? " translateY(-10px)" : " translateY(10px)";
+  el.animate(REDUCED_MOTION ? [                                                      // no movement for "reduce motion": it only fades
+    { opacity: 0, transform: base }, { opacity: 1, transform: base, offset: 0.15 },
+    { opacity: 1, transform: base, offset: 0.75 }, { opacity: 0, transform: base },
   ] : [
-    { opacity: 0, transform: "translate(-50%,-30%) scale(.8)" },
-    { opacity: 1, transform: "translate(-50%,-90%) scale(1)", offset: 0.15 },
-    { opacity: 1, transform: "translate(-50%,-110%) scale(1)", offset: 0.75 },
-    { opacity: 0, transform: "translate(-50%,-140%) scale(1)" },
+    { opacity: 0, transform: base + " scale(.9)" },
+    { opacity: 1, transform: base + " scale(1)", offset: 0.15 },
+    { opacity: 1, transform: base + " scale(1)", offset: 0.75 },
+    { opacity: 0, transform: base + away },
   ], { duration: 1900, easing: "ease-out" }).onfinish = () => el.remove();
 }
 
@@ -862,7 +872,7 @@ function celebrate(p) {
   const [x, z] = toWorld(p.cx, p.cy), r = p.rank;
   playRank(r);
   if (r >= 3) holdGame(1000);
-  if (r >= 3) showLabel(patName(p.name), x, z, r);                    // whatever freezes the game also gets its name shown
+  if (r >= 3) showLabel(patName(p.name), x, z, r, p.size);                    // whatever freezes the game also gets its name shown
   if (r >= 3) addRipple(x, z, r, p.size);
   if (r >= 4) addRipple(x, z, r, p.size, 0.15);
   if (r >= 5) addRipple(x, z, r, p.size, 0.3);
