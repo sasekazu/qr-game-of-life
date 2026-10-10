@@ -38,6 +38,16 @@
    - API の制限: Identity Toolkit API と Cloud Firestore API（Token Service API が必要になる場合もあります）
    App Check は現段階では入れていません。
 
+## Rules の自動テスト
+
+不正操作（他人のスコアの変更・削除、10,000点超、未認証での登録など）を Firestore エミュレータで確かめるテストが [tests/rules/](tests/rules/) にあります。Java 11 以上が必要です。
+
+```bash
+cd tests/rules
+npm install
+npm test
+```
+
 ## ローカルでの動作確認
 
 main に公開しなくても、ブランチ上でローカルサーバーを立てれば確認できます（Firebase は `localhost` を最初から許可しています）。
