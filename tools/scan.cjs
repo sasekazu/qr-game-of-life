@@ -12,7 +12,7 @@ const MAX_GEN = +process.env.MAX_GEN || 1000;
 const MIN_RANK = +process.env.MIN_RANK || 3;
 const PAD = 12;                     // same as index.html
 const ECL = 1;                      // error correction M, same as index.html
-const SPEED = { glider: 0.3, lwss: 0.55 };   // keep in sync with index.html (pattern ids)
+const SPEED = { glider: 0.3, lwss: 0.55, mwss: 0.55, hwss: 0.55 };   // keep in sync with index.html (pattern ids)
 const MEMORY = p => (SPEED[p.name] ? 30 : 6);
 
 const chars = process.argv[2];

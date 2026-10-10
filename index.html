@@ -852,6 +852,17 @@ const PATTERNS = [
   ["pulsar", 5, 3, "..OOO...OOO../............./O....O.O....O/O....O.O....O/O....O.O....O/..OOO...OOO../............./..OOO...OOO../O....O.O....O/O....O.O....O/O....O.O....O/............./..OOO...OOO.."],
   ["glider", 4, 4, ".O./..O/OOO"],
   ["lwss", 5, 4, "O..O./....O/O...O/.OOOO"],
+  ["snake", 5, 1, "OO.O/O.OO"],
+  ["carrier", 5, 1, "OO../O..O/..OO"],
+  ["barge", 4, 1, ".O../O.O./.O.O/..O."],
+  ["longboat", 3, 1, "OO../O.O./.O.O/..O."],
+  ["mango", 4, 1, ".OO../O..O./.O..O/..OO."],
+  ["eater", 5, 1, "OO../O.O./..O./..OO"],
+  ["clock", 5, 2, "..O./O.O./.O.O/.O.."],
+  ["figure8", 5, 8, "OOO.../OOO.../OOO.../...OOO/...OOO/...OOO"],
+  ["mwss", 5, 4, "..O.../O...O./.....O/O....O/.OOOOO"],
+  ["hwss", 5, 4, "..OO.../O....O./......O/O.....O/.OOOOOO"],
+  ["rpent", 2, 1, ".OO/OO./.O."],
 ];
 
 // cell list -> orientation-independent-of-position key
@@ -927,7 +938,7 @@ function findPatterns() {
 // off an edge (or be unrecognisable while touching other cells) and come back elsewhere. A lost
 // pattern is therefore remembered for a while, and may reappear within the distance it could
 // have travelled in the meantime (edge wrap-around included) without counting as new.
-const SPEED = { glider: 0.3, lwss: 0.55 };   // cells per generation, upper bound
+const SPEED = { glider: 0.3, lwss: 0.55, mwss: 0.55, hwss: 0.55 };   // cells per generation, upper bound
 const MEMORY = p => (SPEED[p.name] ? 30 : 6);                              // generations a lost pattern is remembered
 let tracked = [];
 function detect(silent = false) {
@@ -976,7 +987,9 @@ const I18N = {
     guide: "Pattern guide", close: "Close",
     rarity: r => `Rarity ${r} / 5`,
     names: { block: "Block", beehive: "Beehive", loaf: "Loaf", boat: "Boat", ship: "Ship", tub: "Tub", pond: "Pond",
-             blinker: "Blinker", toad: "Toad", beacon: "Beacon", pulsar: "Pulsar", glider: "Glider", lwss: "Lightweight spaceship" },
+             blinker: "Blinker", toad: "Toad", beacon: "Beacon", pulsar: "Pulsar", glider: "Glider", lwss: "Lightweight spaceship",
+             snake: "Snake", carrier: "Carrier", barge: "Barge", longboat: "Long boat", mango: "Mango", eater: "Eater", clock: "Clock",
+             figure8: "Figure eight", mwss: "Middleweight spaceship", hwss: "Heavyweight spaceship", rpent: "R-pentomino" },
   },
   ja: {
     label: "JA",
@@ -991,7 +1004,9 @@ const I18N = {
     guide: "パターン一覧", close: "閉じる",
     rarity: r => `レア度 ${r} / 5`,
     names: { block: "ブロック", beehive: "ビーハイブ", loaf: "ローフ", boat: "ボート", ship: "シップ", tub: "タブ", pond: "ポンド",
-             blinker: "ブリンカー", toad: "ヒキガエル", beacon: "ビーコン", pulsar: "パルサー", glider: "グライダー", lwss: "軽量宇宙船" },
+             blinker: "ブリンカー", toad: "ヒキガエル", beacon: "ビーコン", pulsar: "パルサー", glider: "グライダー", lwss: "軽量宇宙船",
+             snake: "スネーク", carrier: "キャリア", barge: "バージ", longboat: "ロングボート", mango: "マンゴー", eater: "イーター", clock: "クロック",
+             figure8: "フィギュアエイト", mwss: "中量宇宙船", hwss: "重量宇宙船", rpent: "R-ペントミノ" },
   },
 };
 let lang = "en";
