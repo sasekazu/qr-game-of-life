@@ -40,7 +40,10 @@
     width: 64px; height: 64px; flex: none;
     image-rendering: pixelated; border-radius: 10px; border: 1px solid var(--line); background: #fff;
   }
-  .hint { margin: 8px 4px 0; font-size: 12.5px; color: var(--sub); }
+  .hintrow { display: flex; justify-content: space-between; gap: 12px; margin: 8px 4px 0; }
+  .hint { margin: 0; font-size: 12.5px; color: var(--sub); }
+  .count { flex: none; font-size: 12.5px; color: var(--sub); font-variant-numeric: tabular-nums; }
+  .count.over { color: var(--ink); font-weight: 600; }
   .hint.err { color: var(--ink); font-weight: 600; }
   .stage { position: relative; margin-top: 12px; }
   #life {
@@ -121,7 +124,7 @@
       <button id="go" class="go" aria-label="Start"></button>
       <canvas id="qr" width="1" height="1" aria-label="QR code preview"></canvas>
     </div>
-    <p class="hint" id="hint"></p>
+    <div class="hintrow"><p class="hint" id="hint"></p><span class="count" id="count"></span></div>
     <div class="stage">
       <div id="life" role="img" aria-label="Game of Life"></div>
       <div class="note" id="note"></div>
@@ -129,6 +132,7 @@
     <div class="bar">
       <span class="gen" id="genbox"><span id="genicon"></span><span id="gen">0</span></span>
       <span class="btns">
+        <button id="cls" class="ghost icon"></button>
         <button id="guideBtn" class="ghost icon"></button>
         <button id="lang" class="ghost lang"></button>
         <button id="snd" class="ghost icon" aria-pressed="true"></button>
@@ -388,9 +392,14 @@ const QR = (() => {
 /* ===================== Game of Life ===================== */
 const $ = id => document.getElementById(id);
 const PAD = 12, FPS = 12;
-// Every input is encoded at the same QR version (41 x 41 modules, up to 106 bytes), so every game starts on a board
-// of the same size with a similar number of live cells: the games are comparable.
-const QR_VERSION = 6;
+// Board classes. Every input is encoded at its class's fixed QR version, so every game in a class starts on a board of
+// the same size with a similar number of live cells: games in a class are comparable.
+//   small: QR version 1 = 21 x 21 modules, up to 14 bytes     large: version 6 = 41 x 41, up to 106 bytes
+const BOARD_CLASSES = { small: 1, large: 6 };
+let boardClass = "small";
+try { const c = localStorage.getItem("qrlife-class"); if (c in BOARD_CLASSES) boardClass = c; } catch (e) { /* storage unavailable */ }
+const qrVersion = () => BOARD_CLASSES[boardClass];
+const boardSize = () => 17 + 4 * qrVersion();
 const CELL_H = 0.5;      // height of a living cell (cube column)
 // cell colour: plain cells, then rank 1..5 (cool -> hot)
 const RANK_COLORS = ["#111111", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#a855f7"];
@@ -832,35 +841,37 @@ function step() {
 }
 
 /* ---- famous patterns ---- */
-// [id, rank, period, first phase]. The rank is the rarity: the share of ~1100 QR "soups" on the fixed 41 x 41 board
-// (every printable ASCII character plus random strings, run for 1000 generations) in which the pattern ever appeared:
-//   1: 95%+   2: 60-95%   3: 15-60%   4: 3-15%   5: under 3%
-// Measure again (node tools/tally.cjs 1000) after changing the board size or the pattern list.
+// [id, { small: rank, large: rank }, period, first phase]. A rank (1-5) is the rarity, set by how OFTEN the pattern
+// appears (counted as in the log: a new appearance), as a ladder: about once per 1000 generations is rank 5, once per
+// 300 is rank 4, once per 100 rank 3, once per 30 rank 2 and anything more frequent rank 1. Each class has its own
+// ranks (a smaller board has fewer live cells, so everything is rarer there). The values come from
+// `node tools/tally.cjs 1000 small|large` (~1100 QR "soups" of 1000 generations: every printable ASCII character plus
+// random strings that fit); its "suggest" column is what to put here. Measure again after changing a class or the list.
 const PATTERNS = [
-  ["block", 1, 1, "OO/OO"],
-  ["beehive", 1, 1, ".OO./O..O/.OO."],
-  ["loaf", 1, 1, ".OO./O..O/.O.O/..O."],
-  ["boat", 1, 1, "OO./O.O/.O."],
-  ["ship", 2, 1, "OO./O.O/.OO"],
-  ["tub", 2, 1, ".O./O.O/.O."],
-  ["pond", 2, 1, ".OO./O..O/O..O/.OO."],
-  ["blinker", 1, 2, "OOO"],
-  ["toad", 3, 2, ".OOO/OOO."],
-  ["beacon", 3, 2, "OO../OO../..OO/..OO"],
-  ["pulsar", 5, 3, "..OOO...OOO../............./O....O.O....O/O....O.O....O/O....O.O....O/..OOO...OOO../............./..OOO...OOO../O....O.O....O/O....O.O....O/O....O.O....O/............./..OOO...OOO.."],
-  ["glider", 1, 4, ".O./..O/OOO"],
-  ["lwss", 5, 4, "O..O./....O/O...O/.OOOO"],
-  ["snake", 5, 1, "OO.O/O.OO"],
-  ["carrier", 4, 1, "OO../O..O/..OO"],
-  ["barge", 4, 1, ".O../O.O./.O.O/..O."],
-  ["longboat", 3, 1, "OO../O.O./.O.O/..O."],
-  ["mango", 4, 1, ".OO../O..O./.O..O/..OO."],
-  ["eater", 4, 1, "OO../O.O./..O./..OO"],
-  ["clock", 5, 2, "..O./O.O./.O.O/.O.."],
-  ["figure8", 5, 8, "OOO.../OOO.../OOO.../...OOO/...OOO/...OOO"],
-  ["mwss", 5, 4, "..O.../O...O./.....O/O....O/.OOOOO"],
-  ["hwss", 5, 4, "..OO.../O....O./......O/O.....O/.OOOOOO"],
-  ["rpent", 2, 1, ".OO/OO./.O."],
+  ["block", { small: 1, large: 1 }, 1, "OO/OO"],
+  ["beehive", { small: 2, large: 1 }, 1, ".OO./O..O/.OO."],
+  ["loaf", { small: 3, large: 2 }, 1, ".OO./O..O/.O.O/..O."],
+  ["boat", { small: 3, large: 2 }, 1, "OO./O.O/.O."],
+  ["ship", { small: 5, large: 4 }, 1, "OO./O.O/.OO"],
+  ["tub", { small: 4, large: 3 }, 1, ".O./O.O/.O."],
+  ["pond", { small: 4, large: 4 }, 1, ".OO./O..O/O..O/.OO."],
+  ["blinker", { small: 2, large: 1 }, 2, "OOO"],
+  ["toad", { small: 5, large: 5 }, 2, ".OOO/OOO."],
+  ["beacon", { small: 5, large: 5 }, 2, "OO../OO../..OO/..OO"],
+  ["pulsar", { small: 5, large: 5 }, 3, "..OOO...OOO../............./O....O.O....O/O....O.O....O/O....O.O....O/..OOO...OOO../............./..OOO...OOO../O....O.O....O/O....O.O....O/O....O.O....O/............./..OOO...OOO.."],
+  ["glider", { small: 3, large: 2 }, 4, ".O./..O/OOO"],
+  ["lwss", { small: 5, large: 5 }, 4, "O..O./....O/O...O/.OOOO"],
+  ["snake", { small: 5, large: 5 }, 1, "OO.O/O.OO"],
+  ["carrier", { small: 5, large: 5 }, 1, "OO../O..O/..OO"],
+  ["barge", { small: 5, large: 5 }, 1, ".O../O.O./.O.O/..O."],
+  ["longboat", { small: 5, large: 4 }, 1, "OO../O.O./.O.O/..O."],
+  ["mango", { small: 5, large: 5 }, 1, ".OO../O..O./.O..O/..OO."],
+  ["eater", { small: 5, large: 5 }, 1, "OO../O.O./..O./..OO"],
+  ["clock", { small: 5, large: 5 }, 2, "..O./O.O./.O.O/.O.."],
+  ["figure8", { small: 5, large: 5 }, 8, "OOO.../OOO.../OOO.../...OOO/...OOO/...OOO"],
+  ["mwss", { small: 5, large: 5 }, 4, "..O.../O...O./.....O/O....O/.OOOOO"],
+  ["hwss", { small: 5, large: 5 }, 4, "..OO.../O....O./......O/O.....O/.OOOOOO"],
+  ["rpent", { small: 4, large: 3 }, 1, ".OO/OO./.O."],
 ];
 
 // cell list -> orientation-independent-of-position key
@@ -873,9 +884,10 @@ const SYMS = [(x, y) => [x, y], (x, y) => [-x, y], (x, y) => [x, -y], (x, y) => 
 
 // every phase x every rotation/reflection -> name (phases are produced by simulating the pattern)
 const KNOWN = new Map();
-const RANK = {};
+const RANKS = {};
+const rankOf = id => RANKS[id][boardClass];   // rarity of a pattern in the current class
 for (const [name, rank, period, art] of PATTERNS) {
-  RANK[name] = rank;
+  RANKS[name] = rank;
   const G = 48, a = new Uint8Array(G * G), b = new Uint8Array(G * G);
   art.split("/").forEach((row, y) => [...row].forEach((ch, x) => { if (ch === "O") a[(y + 16) * G + x + 16] = 1; }));
   let s = a, t = b;
@@ -920,11 +932,11 @@ function findPatterns() {
     if (!name) continue;
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const [x, y, idx] of cells) {
-      tint[idx] = RANK[name];                            // colour the pattern by its rank
+      tint[idx] = rankOf(name);                            // colour the pattern by its rank
       x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
     }
     const mod = v => ((v % N) + N) % N;                  // centre of a group straddling an edge is brought back on board
-    found.push({ name, rank: RANK[name], cx: mod((x0 + x1) / 2), cy: mod((y0 + y1) / 2), size: Math.max(x1 - x0, y1 - y0) + 1 });
+    found.push({ name, rank: rankOf(name), cx: mod((x0 + x1) / 2), cy: mod((y0 + y1) / 2), size: Math.max(x1 - x0, y1 - y0) + 1 });
   }
   return found;
 }
@@ -983,6 +995,7 @@ const I18N = {
     pause: "Pause", resume: "Resume", restart: "Restart", lang: "Language",
     logLabel: "Detected patterns", logEmpty: "Patterns you find will appear here",
     guide: "Pattern guide", close: "Close",
+    classSmall: "Small board", classLarge: "Large board", upTo: n => `up to ${n} bytes`,
     rarity: r => `Rarity ${r} / 5`,
     names: { block: "Block", beehive: "Beehive", loaf: "Loaf", boat: "Boat", ship: "Ship", tub: "Tub", pond: "Pond",
              blinker: "Blinker", toad: "Toad", beacon: "Beacon", pulsar: "Pulsar", glider: "Glider", lwss: "Lightweight spaceship",
@@ -1000,6 +1013,7 @@ const I18N = {
     pause: "一時停止", resume: "再開", restart: "最初から", lang: "言語",
     logLabel: "検出したパターン", logEmpty: "見つけたパターンがここに表示されます",
     guide: "パターン一覧", close: "閉じる",
+    classSmall: "小さい盤面", classLarge: "大きい盤面", upTo: n => `最大 ${n} バイト`,
     rarity: r => `レア度 ${r} / 5`,
     names: { block: "ブロック", beehive: "ビーハイブ", loaf: "ローフ", boat: "ボート", ship: "シップ", tub: "タブ", pond: "ポンド",
              blinker: "ブリンカー", toad: "ヒキガエル", beacon: "ビーコン", pulsar: "パルサー", glider: "グライダー", lwss: "軽量宇宙船",
@@ -1021,6 +1035,14 @@ const ICON = {
   restart: size => svg('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v5h5"/>', size),
   soundOn: size => svg(SPK + '<path d="M15.5 9a4.5 4.5 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/>', size),
   soundOff: size => svg(SPK + '<path d="M16 9.5l5 5M21 9.5l-5 5"/>', size),
+  // a grid of n x n small squares: few big squares = small board, many small squares = large board
+  grid: (n, size) => {
+    const cell = 20 / (n + (n - 1) * 0.5), gap = cell * 0.5;
+    let r = "";
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++)
+      r += `<rect x="${2 + x * (cell + gap)}" y="${2 + y * (cell + gap)}" width="${cell}" height="${cell}" rx="${cell * 0.2}"/>`;
+    return svg(`<g fill="currentColor" stroke="none">${r}</g>`, size);
+  },
   book: size => svg('<path d="M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2z"/><path d="M4 20a2 2 0 0 1 2-2h13v3H6a2 2 0 0 1-2-1z"/><path d="M9 7.5h6"/>', size),
   close: size => svg('<path d="M6 6l12 12M18 6L6 18"/>', size),
   globe: size => svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.8 2.5 4 5.6 4 9s-1.2 6.5-4 9c-2.8-2.5-4-5.6-4-9s1.2-6.5 4-9z"/>', size),
@@ -1028,7 +1050,7 @@ const ICON = {
   glider: size => svg('<g fill="currentColor" stroke="none"><rect x="9" y="2" width="6" height="6" rx="1"/><rect x="16" y="9" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/></g>', size),
 };
 
-const goBtn = $("go"), hint = $("hint"), toggleBtn = $("toggle"), resetBtn = $("reset"), sndBtn = $("snd"), langBtn = $("lang"), guideBtn = $("guideBtn"), guide = $("guide"), guideList = $("guideList");
+const goBtn = $("go"), hint = $("hint"), toggleBtn = $("toggle"), resetBtn = $("reset"), sndBtn = $("snd"), langBtn = $("lang"), clsBtn = $("cls"), countEl = $("count"), guideBtn = $("guideBtn"), guide = $("guide"), guideList = $("guideList");
 let pending = null;                  // QR of the text now in the box (null: empty or too long)
 let hintState = { tooLong: 0 };      // tooLong: the byte limit to show, or 0
 
@@ -1041,7 +1063,7 @@ function fillLogItem(e) {
     `<span class="n">${patName(e.id)}</span>${e.count > 1 ? `<span class="g">×${e.count}</span>` : ""}`;
 }
 function log(id, count) {
-  const rank = RANK[id], li = document.createElement("li");
+  const rank = rankOf(id), li = document.createElement("li");
   li.className = "r" + rank;
   const e = { id, rank, li, gen, count };
   fillLogItem(e);
@@ -1065,6 +1087,15 @@ function syncButtons() {
   toggleBtn.setAttribute("aria-label", toggleBtn.title);
   toggleBtn.disabled = resetBtn.disabled = !hasQR;
 }
+function classLabel() {
+  const t = T(), n = boardSize();
+  return `${boardClass === "small" ? t.classSmall : t.classLarge} · ${n}×${n} · ${t.upTo(QR.maxBytes(qrVersion(), 1))}`;
+}
+function syncClass() {
+  clsBtn.innerHTML = ICON.grid(boardClass === "small" ? 3 : 5);
+  clsBtn.title = classLabel();
+  clsBtn.setAttribute("aria-label", clsBtn.title);
+}
 function syncSound() {
   const t = T();
   sndBtn.innerHTML = soundOn ? ICON.soundOn() : ICON.soundOff();
@@ -1084,9 +1115,9 @@ function patternSVG(art, color) {
 }
 function renderGuide() {
   const t = T();
-  $("guideTitle").textContent = t.guide;
+  $("guideTitle").textContent = `${t.guide} · ${boardClass === "small" ? t.classSmall : t.classLarge}`;
   guideList.innerHTML = PATTERNS
-    .map((pt, i) => ({ id: pt[0], rank: pt[1], art: pt[3], i }))
+    .map((pt, i) => ({ id: pt[0], rank: rankOf(pt[0]), art: pt[3], i }))
     .sort((a, b) => b.rank - a.rank || a.i - b.i)
     .map(e => `<li class="r${e.rank}"><div class="thumb">${patternSVG(e.art, RANK_COLORS[e.rank])}</div>` +
       `<div class="info"><span class="n">${patName(e.id)}</span>` +
@@ -1125,6 +1156,7 @@ function applyLang() {
   renderHint();
   syncButtons();
   syncSound();
+  syncClass();
 }
 
 /* ---- input -> QR preview -> start ---- */
@@ -1142,6 +1174,9 @@ function preview() {
   const bytes = enc.encode(text.value), c = qrCanvas.getContext("2d");
   pending = null;
   hintState.tooLong = 0;
+  const max = QR.maxBytes(qrVersion(), 1);
+  countEl.textContent = `${bytes.length} / ${max}`;
+  countEl.classList.toggle("over", bytes.length > max);
   if (!bytes.length) {
     qrCanvas.width = qrCanvas.height = 1;
     c.fillStyle = "#fff"; c.fillRect(0, 0, 1, 1);
@@ -1150,8 +1185,8 @@ function preview() {
     return;
   }
   let qr;
-  try { qr = QR.encode(bytes, 1, QR_VERSION); }
-  catch (e) { hintState.tooLong = QR.maxBytes(QR_VERSION, 1); renderHint(); return; }
+  try { qr = QR.encode(bytes, 1, qrVersion()); }
+  catch (e) { hintState.tooLong = QR.maxBytes(qrVersion(), 1); renderHint(); return; }
   pending = qr;
   const q = 4, n = qr.size + q * 2;     // with quiet zone
   qrCanvas.width = qrCanvas.height = n;
@@ -1198,6 +1233,14 @@ text.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); start(); }
 });
 goBtn.onclick = start;
+clsBtn.onclick = () => {                              // switch class: the board and its limits change, so re-preview
+  const names = Object.keys(BOARD_CLASSES);
+  boardClass = names[(names.indexOf(boardClass) + 1) % names.length];
+  try { localStorage.setItem("qrlife-class", boardClass); } catch (e) { /* ignore */ }
+  syncClass();
+  renderGuide();
+  preview();
+};
 guideBtn.onclick = () => guide.showModal();
 $("guideClose").onclick = () => guide.close();
 guide.addEventListener("click", e => { if (e.target === guide) guide.close(); });   // click on the backdrop

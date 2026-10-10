@@ -12,7 +12,7 @@ const code = [
 ].join("\n");
 const ctx = { TextEncoder };
 vm.createContext(ctx);
-vm.runInContext("var N = 0, cur, tint;\n" + code +
+vm.runInContext("var N = 0, cur, tint, boardClass = \"large\";\n" + code +
   "\nthis.lifeStep = lifeStep; this.findPatterns = findPatterns; this.PATTERNS = PATTERNS; this.KNOWN = KNOWN;" +
   "\nthis.setState = (n, c, t) => { N = n; cur = c; tint = t; };", ctx);
 

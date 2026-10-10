@@ -3,6 +3,7 @@
 //
 //   node tools/scan.cjs "abc[7"            characters to try (each one is tested as a 1-character text)
 //   MAX_GEN=2000 MIN_RANK=4 node tools/scan.cjs "[7AN"
+//   CLASS=small node tools/scan.cjs "abc"  board class (small | large, default large); ranks are per class
 //
 // The QR encoder, pattern table and pattern finder are cut out of index.html at run time,
 // so the scan always matches the page. Pattern tracking mirrors detect() (without effects).
@@ -19,7 +20,10 @@ const chars = process.argv[2];
 if (!chars) { console.error('usage: node tools/scan.cjs "<characters>"'); process.exit(1); }
 
 const src = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
-const QR_VERSION = +src.match(/const QR_VERSION = (\d+);/)[1];   // the page's fixed QR version
+const BOARD_CLASSES = eval("(" + src.match(/const BOARD_CLASSES = (\{.*?\});/)[1] + ")");   // class -> QR version
+const CLS = process.env.CLASS || "large";
+if (!(CLS in BOARD_CLASSES)) throw new Error("CLASS must be one of: " + Object.keys(BOARD_CLASSES).join(", "));
+const QR_VERSION = BOARD_CLASSES[CLS];
 const cut = (a, b) => {
   const i = src.indexOf(a), j = src.indexOf(b, i);
   if (i < 0 || j < 0) throw new Error("index.html layout changed, cannot find: " + a);
@@ -34,7 +38,7 @@ const code = [
 const ctx = { TextEncoder };
 vm.createContext(ctx);
 vm.runInContext(
-  "var N = 0, cur, tint;\n" + code +
+  "var N = 0, cur, tint, boardClass = " + JSON.stringify(CLS) + ";\n" + code +
   "\nthis.QR = QR; this.lifeStep = lifeStep; this.findPatterns = findPatterns;" +
   "\nthis.setState = (n, c, t) => { N = n; cur = c; tint = t; };", ctx);
 
