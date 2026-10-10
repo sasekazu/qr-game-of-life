@@ -152,6 +152,30 @@
   }
   .note[hidden] { display: none; }
   .note { position: absolute; inset: 0; display: grid; place-items: center; color: var(--sub); pointer-events: none; }
+  /* online ranking */
+  .post { display: flex; gap: 6px; margin-top: 10px; width: min(86%, 300px); }
+  .post[hidden], .post-msg[hidden], #rankBtn[hidden] { display: none; }
+  .post input {
+    flex: 1; min-width: 0; height: 36px; border: 0; outline: 0; padding: 0 12px;
+    font: inherit; font-size: 14px; color: var(--ink); background: #fff; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line);
+  }
+  .post input:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+  .post button { height: 36px; border-radius: 12px; }
+  .post-msg { margin: 6px 24px 0; font-size: 12.5px; color: var(--sub); text-align: center; }
+  .rank-tabs { display: flex; gap: 6px; padding: 0 22px 8px; }
+  .rank-tabs button { padding: 5px 14px; font-size: 12.5px; }
+  .rank-tabs button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  #rankList { list-style: none; margin: 0; padding: 0 14px 6px; overflow-y: auto; min-height: 120px; }
+  #rankList li { display: flex; align-items: baseline; gap: 12px; padding: 9px 8px; border-top: 1px solid var(--line); font-size: 15px; }
+  #rankList li:first-child { border-top: 0; }
+  #rankList .no { width: 1.8em; flex: none; color: var(--sub); font-variant-numeric: tabular-nums; text-align: right; }
+  #rankList .nm { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #rankList .pt { font-weight: 600; font-variant-numeric: tabular-nums; }
+  #rankList .dt { font-size: 12px; color: var(--sub); font-variant-numeric: tabular-nums; }
+  #rankList li.mine { background: var(--ink); color: #fff; border-radius: 10px; }
+  #rankList li.mine .no, #rankList li.mine .dt { color: #aaa; }
+  #rankList li.msg { display: block; border: 0; color: var(--sub); text-align: center; padding: 28px 8px; }
+  .rank-foot { display: flex; justify-content: flex-end; padding: 4px 14px 14px; }
 </style>
 </head>
 <body>
@@ -170,6 +194,11 @@
           <div class="res-score" id="resScore"></div>
           <div class="res-line" id="resLine"></div>
           <div class="res-why" id="resWhy"></div>
+          <form class="post" id="post" hidden autocomplete="off">
+            <input id="postName" type="text" maxlength="16" spellcheck="false" enterkeyhint="send">
+            <button id="postGo" type="submit"></button>
+          </form>
+          <div class="post-msg" id="postMsg" hidden></div>
           <button id="again" class="ghost icon"></button>
         </div>
       </div>
@@ -186,6 +215,7 @@
       <span class="btns">
         <button id="cls" class="ghost icon"></button>
         <button id="guideBtn" class="ghost icon"></button>
+        <button id="rankBtn" class="ghost icon" hidden></button>
         <button id="lang" class="ghost lang"></button>
         <button id="snd" class="ghost icon" aria-pressed="true"></button>
         <button id="toggle" class="ghost icon" disabled></button>
@@ -198,6 +228,13 @@
   <dialog id="guide">
     <div class="guide-head"><h2 id="guideTitle"></h2><button id="guideClose" class="ghost icon"></button></div>
     <ul id="guideList"></ul>
+  </dialog>
+
+  <dialog id="rankDlg">
+    <div class="guide-head"><h2 id="rankTitle"></h2><button id="rankClose" class="ghost icon"></button></div>
+    <div class="rank-tabs" id="rankTabs"></div>
+    <ul id="rankList" aria-live="polite"></ul>
+    <div class="rank-foot"><button id="rankRefresh" class="ghost icon"></button></div>
   </dialog>
 
 <script type="importmap">
@@ -974,6 +1011,7 @@ function finish(reason) {
   renderResult();
   syncButtons();
   playRank(isBest ? 5 : 3);
+  offerPost();                                        // online ranking (defined further down; does nothing when it is off)
 }
 function renderResult() {
   const box = $("result"), t = T();
@@ -1145,6 +1183,13 @@ const I18N = {
     progress: "Progress", score: "Score", best: n => `Best ${n}`, newBest: "New best!", replay: "Replay",
     endLimit: n => `${n} generations played`, endSettled: g => `Nothing new can happen: the board repeats itself (generation ${g})`,
     classSmall: "Small board", classLarge: "Large board", upTo: n => `up to ${n} bytes`,
+    rank: {
+      title: "Ranking · Top 10", btn: "Ranking", namePh: "Your name", post: "Post", refresh: "Refresh", loading: "Loading…",
+      nameNeeded: "Enter a name to post your score", saved: "Posted to the ranking!",
+      kept: b => `You already have a better score online (${b})`,
+      error: "Could not reach the ranking. The game is not affected; try again later.",
+      empty: "No scores yet. Be the first!",
+    },
     rarity: r => `Rarity ${r} / 5`,
     names: { block: "Block", beehive: "Beehive", loaf: "Loaf", boat: "Boat", ship: "Ship", tub: "Tub", pond: "Pond",
              blinker: "Blinker", toad: "Toad", beacon: "Beacon", pulsar: "Pulsar", glider: "Glider", lwss: "Lightweight spaceship",
@@ -1165,6 +1210,13 @@ const I18N = {
     progress: "進捗", score: "得点", best: n => `ベスト ${n}`, newBest: "ベスト更新！", replay: "もう一度見る",
     endLimit: n => `${n}世代まで到達`, endSettled: g => `${g}世代で同じ動きの繰り返しになりました（もう新しいパターンは出ません）`,
     classSmall: "小さい盤面", classLarge: "大きい盤面", upTo: n => `最大 ${n} バイト`,
+    rank: {
+      title: "ランキング · 上位10人", btn: "ランキング", namePh: "名前", post: "登録", refresh: "更新", loading: "読み込み中…",
+      nameNeeded: "名前を入力すると登録できます", saved: "ランキングに登録しました！",
+      kept: b => `オンラインに、より高いスコア（${b}）が登録済みです`,
+      error: "ランキングに接続できませんでした。ゲームには影響ありません。しばらくしてからもう一度お試しください。",
+      empty: "まだ記録がありません。一番乗りを目指しましょう！",
+    },
     rarity: r => `レア度 ${r} / 5`,
     names: { block: "ブロック", beehive: "ビーハイブ", loaf: "ローフ", boat: "ボート", ship: "シップ", tub: "タブ", pond: "ポンド",
              blinker: "ブリンカー", toad: "ヒキガエル", beacon: "ビーコン", pulsar: "パルサー", glider: "グライダー", lwss: "軽量宇宙船",
@@ -1195,6 +1247,7 @@ const ICON = {
     return svg(`<g fill="currentColor" stroke="none">${r}</g>`, size);
   },
   trophy: size => svg('<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4"/><path d="M12 13v4M8 20h8M10 17h4"/>', size),
+  podium: size => svg('<rect x="3" y="12" width="5" height="8" rx="1"/><rect x="9.5" y="5" width="5" height="15" rx="1"/><rect x="16" y="14" width="5" height="6" rx="1"/>', size),
   book: size => svg('<path d="M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2z"/><path d="M4 20a2 2 0 0 1 2-2h13v3H6a2 2 0 0 1-2-1z"/><path d="M9 7.5h6"/>', size),
   close: size => svg('<path d="M6 6l12 12M18 6L6 18"/>', size),
   globe: size => svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.8 2.5 4 5.6 4 9s-1.2 6.5-4 9c-2.8-2.5-4-5.6-4-9s1.2-6.5 4-9z"/>', size),
@@ -1314,6 +1367,7 @@ function applyLang() {
   $("guideClose").title = t.close;
   $("guideClose").setAttribute("aria-label", t.close);
   renderGuide();
+  renderRankStatic();
   logEl.setAttribute("aria-label", t.logLabel);
   logEl.dataset.empty = t.logEmpty;
   entries.forEach(fillLogItem);
@@ -1322,6 +1376,118 @@ function applyLang() {
   syncSound();
   syncClass();
 }
+
+/* ===================== Online ranking (optional, see RANKING.md) ===================== */
+// The game never depends on this. firebase-config.js tells whether Firebase is set up; ranking.js (the Firebase SDK) is
+// only loaded when a game ends or the ranking is opened, and every failure ends in a message, never in an exception.
+const rankBtn = $("rankBtn"), rankDlg = $("rankDlg"), rankList = $("rankList"), postForm = $("post"), postName = $("postName");
+let rankingOn = false, rankLoading = null;
+let postCls = null, postScore = 0, postMsg = null;            // the finished game on offer, and the message under the form
+let rankCls = "small", rankState = { kind: "loading" };
+try { postName.value = localStorage.getItem("qrlife-name") || ""; } catch (e) { /* storage unavailable */ }
+
+const loadRanking = () => rankLoading ??= import("./ranking.js").catch(e => { rankLoading = null; throw e; });
+import("./firebase-config.js").then(m => { rankingOn = m.rankingEnabled; rankBtn.hidden = !rankingOn; }).catch(() => { /* no ranking */ });
+
+function renderPost() {
+  const t = T().rank, msg = $("postMsg");
+  postName.placeholder = t.namePh;
+  postName.setAttribute("aria-label", t.namePh);
+  $("postGo").textContent = t.post;
+  msg.hidden = !postMsg;
+  msg.textContent = postMsg ? postMsg(t) : "";
+}
+function offerPost() {                                        // called when a game ends
+  if (!rankingOn) return;
+  postCls = boardClass; postScore = resultInfo.score; postMsg = null;
+  postForm.hidden = false;
+  postName.disabled = $("postGo").disabled = false;
+  renderPost();
+  loadRanking().catch(() => {});                              // warm up the SDK while the player types a name
+}
+postForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  postName.disabled = $("postGo").disabled = true;
+  try {
+    const mod = await loadRanking(), name = mod.cleanName(postName.value);
+    if (!name) { postMsg = t => t.nameNeeded; return; }
+    postName.value = name;
+    try { localStorage.setItem("qrlife-name", name); } catch (err) { /* ignore */ }
+    const r = await mod.submitScore(postCls, name, postScore);
+    postForm.hidden = true;
+    postMsg = t => r.saved ? t.saved : t.kept(r.best);
+    openRank(postCls);
+  } catch (err) {
+    postMsg = t => t.error;
+  } finally {
+    postName.disabled = $("postGo").disabled = false;
+    renderPost();
+  }
+});
+
+function renderRankStatic() {                                 // texts that depend on the language
+  const t = T(), r = t.rank;
+  rankBtn.innerHTML = ICON.podium();
+  rankBtn.title = r.btn;
+  rankBtn.setAttribute("aria-label", r.btn);
+  $("rankTitle").textContent = r.title;
+  $("rankClose").innerHTML = ICON.close();
+  $("rankClose").title = t.close;
+  $("rankClose").setAttribute("aria-label", t.close);
+  $("rankRefresh").innerHTML = ICON.restart();
+  $("rankRefresh").title = r.refresh;
+  $("rankRefresh").setAttribute("aria-label", r.refresh);
+  const tabs = $("rankTabs");
+  tabs.replaceChildren(...Object.keys(BOARD_CLASSES).map(cls => {
+    const b = document.createElement("button");
+    b.className = "ghost"; b.dataset.cls = cls;
+    b.textContent = cls === "small" ? t.classSmall : t.classLarge;
+    b.onclick = () => { rankCls = cls; loadRankRows(false); };
+    return b;
+  }));
+  renderPost();
+  renderRank();
+}
+function renderRank() {                                       // names go in with textContent, never as HTML
+  const t = T().rank;
+  for (const b of $("rankTabs").children) b.setAttribute("aria-pressed", b.dataset.cls === rankCls);
+  const msg = text => { const li = document.createElement("li"); li.className = "msg"; li.textContent = text; return [li]; };
+  if (rankState.kind === "loading") rankList.replaceChildren(...msg(t.loading));
+  else if (rankState.kind === "error") rankList.replaceChildren(...msg(t.error));
+  else if (!rankState.rows.length) rankList.replaceChildren(...msg(t.empty));
+  else rankList.replaceChildren(...rankState.rows.map((row, i) => {
+    const li = document.createElement("li");
+    li.className = row.mine ? "mine" : "";
+    for (const [cls, value] of [["no", i + 1], ["nm", row.name], ["pt", row.score],
+        ["dt", row.createdAt ? row.createdAt.toLocaleDateString(lang) : ""]]) {
+      const s = document.createElement("span");
+      s.className = cls; s.textContent = value;
+      li.append(s);
+    }
+    return li;
+  }));
+}
+async function loadRankRows(force) {
+  const cls = rankCls;
+  rankState = { kind: "loading" };
+  renderRank();
+  try {
+    const mod = await loadRanking(), data = await mod.fetchTop(cls, { force });
+    if (cls === rankCls) rankState = { kind: "rows", rows: data.rows };
+  } catch (err) {
+    if (cls === rankCls) rankState = { kind: "error" };
+  }
+  if (cls === rankCls) renderRank();
+}
+function openRank(cls) {
+  rankCls = cls;
+  if (!rankDlg.open) rankDlg.showModal();
+  loadRankRows(false);
+}
+rankBtn.onclick = () => openRank(boardClass);
+$("rankRefresh").onclick = () => loadRankRows(true);
+$("rankClose").onclick = () => rankDlg.close();
+rankDlg.addEventListener("click", e => { if (e.target === rankDlg) rankDlg.close(); });
 
 /* ---- input -> QR preview -> start ---- */
 // the QR centred in an empty field: the Life seed
