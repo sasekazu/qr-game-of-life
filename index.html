@@ -1,0 +1,1212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR Life</title>
+<style>
+  :root { --bg:#f2f2f2; --card:#fff; --ink:#111; --sub:#8a8a8a; --line:#e2e2e2; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    background: var(--bg); color: var(--ink);
+    font: 15px/1.5 "Inter", system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+    padding: 32px 16px;
+  }
+  h1 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: var(--sub); }
+  .card {
+    width: min(100%, 640px);
+    background: var(--card);
+    border-radius: 20px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 32px rgba(0,0,0,.06);
+    padding: 12px;
+  }
+  .input { display: flex; gap: 10px; align-items: center; }
+  #text {
+    flex: 1; min-width: 0; height: 48px; border: 0; outline: 0;
+    padding: 0 16px; font: inherit; font-size: 16px; color: var(--ink);
+    background: #f4f4f4; border-radius: 14px;
+  }
+  #text::placeholder { color: var(--sub); }
+  #text:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+  button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  button svg { display: block; }
+  button.go { width: 56px; height: 48px; padding: 0; border-radius: 14px; }
+  button.icon { width: 38px; height: 38px; padding: 0; border-radius: 12px; }
+  button.lang { height: 38px; padding: 0 12px; border-radius: 12px; font-size: 12px; font-weight: 600; letter-spacing: .04em; }
+  .gen { display: inline-flex; align-items: center; gap: 7px; }
+  #qr {
+    width: 64px; height: 64px; flex: none;
+    image-rendering: pixelated; border-radius: 10px; border: 1px solid var(--line); background: #fff;
+  }
+  .hint { margin: 8px 4px 0; font-size: 12.5px; color: var(--sub); }
+  .hint.err { color: var(--ink); font-weight: 600; }
+  .stage { position: relative; margin-top: 12px; }
+  #life {
+    position: relative; overflow: hidden; width: min(100%, 64vh); margin: 0 auto; aspect-ratio: 1;
+    border-radius: 12px; background: #fafafa;
+  }
+  #life canvas { display: block; }
+  .fx-flash { position: absolute; inset: 0; pointer-events: none; }
+  .fx-label {
+    position: absolute; pointer-events: none; white-space: nowrap;
+    padding: 6px 16px; border-radius: 999px; border: 2px solid;
+    background: var(--ink); color: #fff; font-size: 15px; font-weight: 700; letter-spacing: .04em;
+  }
+  .bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 8px 2px; color: var(--sub); font-size: 13px; font-variant-numeric: tabular-nums; }
+  button {
+    font: inherit; font-size: 13px; cursor: pointer;
+    border: 0; border-radius: 999px; padding: 7px 16px;
+    background: var(--ink); color: #fff;
+  }
+  button.ghost { background: #efefef; color: var(--ink); }
+  button:not(:disabled):hover { opacity: .85; }
+  button:disabled { opacity: .35; cursor: default; }
+  button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .btns { display: flex; gap: 6px; }
+  #log {
+    list-style: none; margin: 8px 0 0; padding: 4px 8px 8px;
+    height: 132px; overflow-y: auto; border-top: 1px solid var(--line);
+    font: 13px/1.9 ui-monospace, "SF Mono", Consolas, monospace;
+  }
+  #log:empty::before { content: attr(data-empty); color: var(--sub); }
+  #log li { display: flex; gap: 14px; }
+  #log .g { color: var(--sub); font-variant-numeric: tabular-nums; }
+  #log .g { display: inline-flex; align-items: center; gap: 5px; }
+  #log li > span:first-child { min-width: 4.5em; }
+  #log .s { letter-spacing: .1em; }
+  #log .r1 .s { color: #3b82f6; }
+  #log .r2 .s { color: #10b981; }
+  #log .r3 .s { color: #f59e0b; }
+  #log .r4 .s { color: #ef4444; }
+  #log .r5 .s { color: #a855f7; }
+  #log .s i { font-style: normal; color: var(--line); }
+  #log li:not(.r4):not(.r5) .n { color: #555; }
+  #log li.r4 .n, #log li.r5 .n { font-weight: 700; }
+  #log li.r5 { background: var(--ink); color: #fff; border-radius: 6px; margin: 2px 0; padding: 0 8px; }
+  #log li.r5 .g { color: #aaa; }
+  #log li.r5 .s i { color: #555; }
+  .note[hidden] { display: none; }
+  .note { position: absolute; inset: 0; display: grid; place-items: center; color: var(--sub); pointer-events: none; }
+</style>
+</head>
+<body>
+  <h1>QR Life</h1>
+  <main class="card">
+    <div class="input">
+      <input id="text" type="text" placeholder="Type text or a URL…" spellcheck="false" autocomplete="off" enterkeyhint="go" autofocus>
+      <button id="go" class="go" aria-label="Start"></button>
+      <canvas id="qr" width="1" height="1" aria-label="QR code preview"></canvas>
+    </div>
+    <p class="hint" id="hint"></p>
+    <div class="stage">
+      <div id="life" role="img" aria-label="Game of Life"></div>
+      <div class="note" id="note"></div>
+    </div>
+    <div class="bar">
+      <span class="gen" id="genbox"><span id="genicon"></span><span id="gen">0</span></span>
+      <span class="btns">
+        <button id="lang" class="ghost lang"></button>
+        <button id="view" class="ghost icon" aria-pressed="true"></button>
+        <button id="snd" class="ghost icon" aria-pressed="true"></button>
+        <button id="toggle" class="ghost icon" disabled></button>
+        <button id="reset" class="ghost icon" disabled></button>
+      </span>
+    </div>
+    <ul id="log"></ul>
+  </main>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+/* ===================== QR code encoder (byte mode, versions 1-40) ===================== */
+const QR = (() => {
+  const ECC_PER_BLOCK = [
+    [-1,  7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+    [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
+    [-1, 13, 22, 18, 26, 18, 24, 18, 22, 20, 24, 28, 26, 24, 20, 30, 24, 28, 28, 26, 30, 28, 30, 30, 30, 30, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+    [-1, 17, 28, 22, 16, 22, 28, 26, 26, 24, 28, 24, 28, 22, 24, 24, 30, 28, 28, 26, 28, 30, 24, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+  ];
+  const NUM_BLOCKS = [
+    [-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4,  4,  4,  4,  4,  6,  6,  6,  6,  7,  8,  8,  9,  9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25],
+    [-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5,  5,  8,  9,  9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49],
+    [-1, 1, 1, 2, 2, 4, 4, 6, 6, 8, 8,  8, 10, 12, 16, 12, 17, 16, 18, 21, 20, 23, 23, 25, 27, 29, 34, 34, 35, 38, 40, 43, 45, 48, 51, 53, 56, 59, 62, 65, 68],
+    [-1, 1, 1, 2, 4, 4, 4, 5, 6, 8, 8, 11, 11, 16, 16, 18, 16, 19, 21, 25, 25, 25, 34, 30, 32, 35, 37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 70, 74, 77, 81],
+  ];
+  const FORMAT_BITS = [1, 0, 3, 2]; // L, M, Q, H
+
+  function rawModules(ver) {
+    let r = (16 * ver + 128) * ver + 64;
+    if (ver >= 2) {
+      const n = Math.floor(ver / 7) + 2;
+      r -= (25 * n - 10) * n - 55;
+      if (ver >= 7) r -= 36;
+    }
+    return r;
+  }
+  const dataCodewords = (ver, ecl) =>
+    Math.floor(rawModules(ver) / 8) - ECC_PER_BLOCK[ecl][ver] * NUM_BLOCKS[ecl][ver];
+  const countBits = ver => (ver <= 9 ? 8 : 16);
+  const maxBytes = (ver, ecl) => Math.floor((dataCodewords(ver, ecl) * 8 - 4 - countBits(ver)) / 8);
+
+  function gfMul(x, y) {
+    let z = 0;
+    for (let i = 7; i >= 0; i--) {
+      z = (z << 1) ^ ((z >>> 7) * 0x11d);
+      z ^= ((y >>> i) & 1) * x;
+    }
+    return z;
+  }
+  function rsDivisor(deg) {
+    const res = new Array(deg).fill(0);
+    res[deg - 1] = 1;
+    let root = 1;
+    for (let i = 0; i < deg; i++) {
+      for (let j = 0; j < deg; j++) {
+        res[j] = gfMul(res[j], root);
+        if (j + 1 < deg) res[j] ^= res[j + 1];
+      }
+      root = gfMul(root, 2);
+    }
+    return res;
+  }
+  function rsRemainder(data, divisor) {
+    const res = divisor.map(() => 0);
+    for (const b of data) {
+      const f = b ^ res.shift();
+      res.push(0);
+      divisor.forEach((c, i) => { res[i] ^= gfMul(c, f); });
+    }
+    return res;
+  }
+
+  function encode(bytes, ecl) {
+    // choose the smallest version that fits
+    let ver = 1;
+    while (ver <= 40 && bytes.length > maxBytes(ver, ecl)) ver++;
+    if (ver > 40) throw new RangeError("too long");
+
+    // bit stream: mode(0100) + count + data + terminator + pad
+    const bits = [];
+    const put = (val, len) => { for (let i = len - 1; i >= 0; i--) bits.push((val >>> i) & 1); };
+    put(4, 4);
+    put(bytes.length, countBits(ver));
+    for (const b of bytes) put(b, 8);
+    const capBits = dataCodewords(ver, ecl) * 8;
+    put(0, Math.min(4, capBits - bits.length));
+    put(0, (8 - (bits.length % 8)) % 8);
+    for (let pad = 0xec; bits.length < capBits; pad ^= 0xec ^ 0x11) put(pad, 8);
+    const data = [];
+    for (let i = 0; i < bits.length; i += 8) {
+      let v = 0;
+      for (let j = 0; j < 8; j++) v = (v << 1) | bits[i + j];
+      data.push(v);
+    }
+
+    // split into blocks, add RS ECC, interleave
+    const nBlocks = NUM_BLOCKS[ecl][ver];
+    const eccLen = ECC_PER_BLOCK[ecl][ver];
+    const rawCw = Math.floor(rawModules(ver) / 8);
+    const nShort = nBlocks - (rawCw % nBlocks);
+    const shortLen = Math.floor(rawCw / nBlocks);
+    const div = rsDivisor(eccLen);
+    const blocks = [];
+    for (let i = 0, k = 0; i < nBlocks; i++) {
+      const dat = data.slice(k, k + shortLen - eccLen + (i < nShort ? 0 : 1));
+      k += dat.length;
+      const ecc = rsRemainder(dat, div);
+      if (i < nShort) dat.push(0);
+      blocks.push(dat.concat(ecc));
+    }
+    const all = [];
+    for (let i = 0; i < blocks[0].length; i++) {
+      blocks.forEach((blk, j) => {
+        if (i !== shortLen - eccLen || j >= nShort) all.push(blk[i]);
+      });
+    }
+
+    // matrix
+    const size = ver * 4 + 17;
+    const m = new Uint8Array(size * size);
+    const fn = new Uint8Array(size * size);
+    const setFn = (x, y, v) => { m[y * size + x] = v ? 1 : 0; fn[y * size + x] = 1; };
+    const bit = (v, i) => (v >>> i) & 1;
+
+    for (let i = 0; i < size; i++) { setFn(6, i, i % 2 === 0); setFn(i, 6, i % 2 === 0); }
+    const finder = (cx, cy) => {
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+        const d = Math.max(Math.abs(dx), Math.abs(dy));
+        const x = cx + dx, y = cy + dy;
+        if (x >= 0 && x < size && y >= 0 && y < size) setFn(x, y, d !== 2 && d !== 4);
+      }
+    };
+    finder(3, 3); finder(size - 4, 3); finder(3, size - 4);
+
+    if (ver > 1) {
+      const n = Math.floor(ver / 7) + 2;
+      const step = ver === 32 ? 26 : Math.ceil((ver * 4 + 4) / (n * 2 - 2)) * 2;
+      const pos = [6];
+      for (let p = size - 7; pos.length < n; p -= step) pos.splice(1, 0, p);
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+        if ((i === 0 && j === 0) || (i === 0 && j === n - 1) || (i === n - 1 && j === 0)) continue;
+        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++)
+          setFn(pos[i] + dx, pos[j] + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+      }
+    }
+
+    const drawFormat = mask => {
+      const d = (FORMAT_BITS[ecl] << 3) | mask;
+      let rem = d;
+      for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+      const b = ((d << 10) | rem) ^ 0x5412;
+      for (let i = 0; i <= 5; i++) setFn(8, i, bit(b, i));
+      setFn(8, 7, bit(b, 6)); setFn(8, 8, bit(b, 7)); setFn(7, 8, bit(b, 8));
+      for (let i = 9; i < 15; i++) setFn(14 - i, 8, bit(b, i));
+      for (let i = 0; i < 8; i++) setFn(size - 1 - i, 8, bit(b, i));
+      for (let i = 8; i < 15; i++) setFn(8, size - 15 + i, bit(b, i));
+      setFn(8, size - 8, 1);
+    };
+    drawFormat(0);
+
+    if (ver >= 7) {
+      let rem = ver;
+      for (let i = 0; i < 12; i++) rem = (rem << 1) ^ ((rem >>> 11) * 0x1f25);
+      const b = (ver << 12) | rem;
+      for (let i = 0; i < 18; i++) {
+        const a = size - 11 + (i % 3), c = Math.floor(i / 3);
+        setFn(a, c, bit(b, i)); setFn(c, a, bit(b, i));
+      }
+    }
+
+    // data bits in zigzag order
+    let bi = 0;
+    for (let right = size - 1; right >= 1; right -= 2) {
+      if (right === 6) right = 5;
+      for (let vert = 0; vert < size; vert++) for (let j = 0; j < 2; j++) {
+        const x = right - j;
+        const y = ((right + 1) & 2) === 0 ? size - 1 - vert : vert;
+        if (!fn[y * size + x] && bi < all.length * 8) {
+          m[y * size + x] = bit(all[bi >>> 3], 7 - (bi & 7));
+          bi++;
+        }
+      }
+    }
+
+    const applyMask = mask => {
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+        let inv;
+        switch (mask) {
+          case 0: inv = (x + y) % 2 === 0; break;
+          case 1: inv = y % 2 === 0; break;
+          case 2: inv = x % 3 === 0; break;
+          case 3: inv = (x + y) % 3 === 0; break;
+          case 4: inv = (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0; break;
+          case 5: inv = ((x * y) % 2) + ((x * y) % 3) === 0; break;
+          case 6: inv = (((x * y) % 2) + ((x * y) % 3)) % 2 === 0; break;
+          default: inv = (((x + y) % 2) + ((x * y) % 3)) % 2 === 0;
+        }
+        if (inv && !fn[y * size + x]) m[y * size + x] ^= 1;
+      }
+    };
+    const countOcc = (s, pat) => {
+      let n = 0;
+      for (let i = s.indexOf(pat); i >= 0; i = s.indexOf(pat, i + 1)) n++;
+      return n;
+    };
+    const penalty = () => {
+      let p = 0, dark = 0;
+      for (let dir = 0; dir < 2; dir++) for (let a = 0; a < size; a++) {
+        let run = 1, prev = -1, s = "";
+        for (let b = 0; b < size; b++) {
+          const v = dir ? m[b * size + a] : m[a * size + b];
+          s += v;
+          if (v === prev) { run++; if (run === 5) p += 3; else if (run > 5) p++; }
+          else { run = 1; prev = v; }
+        }
+        p += 40 * (countOcc(s, "10111010000") + countOcc(s, "00001011101"));
+      }
+      for (let y = 0; y < size - 1; y++) for (let x = 0; x < size - 1; x++) {
+        const c = m[y * size + x];
+        if (c === m[y * size + x + 1] && c === m[(y + 1) * size + x] && c === m[(y + 1) * size + x + 1]) p += 3;
+      }
+      for (let i = 0; i < m.length; i++) dark += m[i];
+      const total = size * size;
+      p += (Math.ceil(Math.abs(dark * 20 - total * 10) / total) - 1) * 10;
+      return p;
+    };
+
+    let best = 0, bestPen = Infinity;
+    for (let mask = 0; mask < 8; mask++) {
+      applyMask(mask); drawFormat(mask);
+      const p = penalty();
+      if (p < bestPen) { bestPen = p; best = mask; }
+      applyMask(mask);
+    }
+    applyMask(best); drawFormat(best);
+    return { size, version: ver, modules: m };
+  }
+
+  return { encode, maxBytes };
+})();
+
+/* ===================== Game of Life ===================== */
+const $ = id => document.getElementById(id);
+const PAD = 12, FPS = 12;
+const CELL_H = 0.5;      // height of a living cell (cube column)
+// cell colour: plain cells, then rank 1..5 (cool -> hot)
+const RANK_COLORS = ["#111111", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#a855f7"];
+
+const logEl = $("log");
+const text = $("text"), qrCanvas = $("qr"), life = $("life"), note = $("note");
+const enc = new TextEncoder();
+
+let N = 0, cur, nxt, seed, gen = 0, running = false, holding = false, hasQR = false;
+
+/* ---- Three.js scene ---- */
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+life.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(20, 1, 0.1, 4000);   // narrow fov: nearly flat, 2D-like
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.enablePan = false;
+controls.enableRotate = false;                        // fixed top-down view; wheel zoom only
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8c8c8c, 1.7));
+const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+sun.position.set(0.5, 1, 0.7);
+scene.add(sun);
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xfafafa }));
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -0.01;
+scene.add(floor);
+
+// The edge of the world: a slightly darker board with a thin frame (the board wraps around, so this is where it does)
+const board = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xf0f0f0 }));
+board.rotation.x = -Math.PI / 2;
+board.position.y = -0.005;
+scene.add(board);
+const FRAME_T = 0.35;                                  // frame thickness, in cells
+const frameMat = new THREE.MeshBasicMaterial({ color: 0xc4c4c4 });
+const edgeStrips = [0, 1, 2, 3].map(() => {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), frameMat);
+  m.rotation.x = -Math.PI / 2;
+  m.position.y = 0.01;
+  scene.add(m);
+  return m;
+});
+function layoutWorldEdge(n) {
+  board.scale.set(n, n, 1);
+  const half = n / 2 + FRAME_T / 2, len = n + FRAME_T * 2;
+  // [centre x, centre z, width, depth] of the top, bottom, left and right strips
+  [[0, -half, len, FRAME_T], [0, half, len, FRAME_T], [-half, 0, FRAME_T, n], [half, 0, FRAME_T, n]].forEach(([x, z, w, d], i) => {
+    edgeStrips[i].position.set(x, 0.01, z);
+    edgeStrips[i].scale.set(w, d, 1);
+  });
+}
+
+const cellGeo = new THREE.BoxGeometry(0.92, 1, 0.92);
+const cellMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.55 });   // colour comes per instance
+const TINT = RANK_COLORS.map(h => new THREE.Color(h));
+let mesh = null, cellScale = new Float32Array(0);   // cellScale: 0..1 animated size of each cell
+let tint = new Uint8Array(0);                        // 0 = plain, 1..5 = part of a detected pattern of that rank
+
+// ---- droplet view: living cells are metaballs, drawn by a fragment shader ----
+// Every live cell adds a smooth bump to a field; where the field passes a threshold there is "water".
+// Neighbouring cells overlap and fuse into one drop, isolated cells stay round, and the field's slope gives
+// each drop a glossy highlight. The board wraps, so drops also fuse across the edges of the world.
+let dropletOn = true;
+try { dropletOn = localStorage.getItem("qrlife-view") !== "cells"; } catch (e) { /* storage unavailable */ }
+const dropMat = new THREE.ShaderMaterial({
+  uniforms: { uCells: { value: null }, uN: { value: 1 } },
+  transparent: true,
+  depthWrite: false,
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: `
+    uniform sampler2D uCells;          // per cell: rgb = pattern colour, a = how alive (0..1, animated)
+    uniform float uN;
+    varying vec2 vUv;
+    const float R = 1.5;               // reach of one cell, in cells
+    const float T = 0.75;              // field level of the water surface
+    void main() {
+      int n = int(uN);
+      vec2 p = vec2(vUv.x, 1.0 - vUv.y) * uN;           // board coordinates, y down
+      ivec2 c0 = ivec2(floor(p));
+      float f = 0.0, wsum = 0.0;
+      vec2 g = vec2(0.0);
+      vec3 col = vec3(0.0);
+      for (int oy = -2; oy <= 2; oy++) {
+        for (int ox = -2; ox <= 2; ox++) {
+          ivec2 c = c0 + ivec2(ox, oy);
+          vec4 d = texelFetch(uCells, ivec2((c.x + n) % n, (c.y + n) % n), 0);
+          if (d.a <= 0.001) continue;
+          vec2 r = p - (vec2(c) + 0.5);
+          float q = dot(r, r) / (R * R);
+          if (q >= 1.0) continue;
+          float k = 1.0 - q;
+          float w = d.a * k * k * k;                     // smooth bump (1 - q)^3
+          f += w;
+          g += d.a * 3.0 * k * k * (-2.0 * r / (R * R)); // its gradient, for the surface normal
+          col += d.rgb * w;
+          wsum += w;
+        }
+      }
+      float e = max(fwidth(f), 1e-4);
+      float a = smoothstep(T - e, T + e, f);             // anti-aliased edge of the drop
+      if (a <= 0.0) discard;
+      vec3 base = col / max(wsum, 1e-4);                 // colours of fused cells blend
+      vec3 nrm = normalize(vec3(-g * 0.45, 1.0));        // tilts outward toward the rim
+      vec3 L = normalize(vec3(-0.5, -0.6, 0.8));         // light from the upper left
+      float diff = clamp(dot(nrm, L), 0.0, 1.0);
+      float spec = pow(max(dot(nrm, normalize(L + vec3(0.0, 0.0, 1.0))), 0.0), 60.0);
+      gl_FragColor = vec4(base * (0.7 + 0.5 * diff) + vec3(0.55) * spec, a);
+      #include <colorspace_fragment>
+    }`,
+});
+const dropMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), dropMat);
+dropMesh.rotation.x = -Math.PI / 2;
+dropMesh.position.y = 0.5;
+scene.add(dropMesh);
+let cellTex = null;                                      // N x N float texture feeding the shader
+
+function applyView() {
+  if (mesh) mesh.visible = !dropletOn;
+  dropMesh.visible = dropletOn;
+}
+
+function resize() {
+  const w = life.clientWidth, h = life.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(life);
+resize();
+
+function buildGrid(n) {
+  if (mesh) { scene.remove(mesh); mesh.dispose(); }
+  mesh = new THREE.InstancedMesh(cellGeo, cellMat, n * n);
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  mesh.frustumCulled = false;
+  const a = mesh.instanceMatrix.array;
+  for (let i = 0; i < n * n; i++) a[i * 16 + 15] = 1;
+  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * n * 3), 3);
+  mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+  scene.add(mesh);
+  if (cellTex) cellTex.dispose();
+  cellTex = new THREE.DataTexture(new Float32Array(n * n * 4), n, n, THREE.RGBAFormat, THREE.FloatType);
+  cellTex.minFilter = cellTex.magFilter = THREE.NearestFilter;
+  dropMat.uniforms.uCells.value = cellTex;
+  dropMat.uniforms.uN.value = n;
+  dropMesh.scale.set(n, n, 1);
+  applyView();
+  layoutWorldEdge(n);
+  floor.scale.set(n * 10, n * 10, 1);                  // same colour as the page: reads as an endless floor
+  controls.minDistance = n * 1;
+  controls.maxDistance = n * 5;
+  resetView();
+}
+
+// straight down, whole field in view
+function resetView() {
+  camera.position.set(0, N * 3.15, 0.001);   // a little margin around the frame
+  controls.target.set(0, 0, 0);
+  controls.update();
+}
+renderer.domElement.addEventListener("dblclick", resetView);
+
+// ease every cell toward alive(1) / dead(0) and its pattern colour, and write its transform
+function animateCells(dt, force = false) {
+  if (!mesh) return;
+  const k = 1 - Math.exp(-dt * (dropletOn ? 14 : 30)), kc = 1 - Math.exp(-dt * 20);   // drops morph more slowly than cubes
+  const a = mesh.instanceMatrix.array, c = mesh.instanceColor.array, o = N / 2 - 0.5, td = cellTex.image.data;
+  let dirty = false, cDirty = false;
+  for (let i = 0; i < N * N; i++) {
+    const t = cur[i];
+    let s = cellScale[i];
+    if (s !== t || force) {
+      s += (t - s) * k;
+      if (Math.abs(t - s) < 0.003) s = t;
+      cellScale[i] = s;
+      const x = i % N, z = (i - x) / N, j = i * 16;
+      a[j] = a[j + 10] = s;
+      a[j + 5] = s * CELL_H;
+      a[j + 12] = x - o;
+      a[j + 13] = s * CELL_H / 2;
+      a[j + 14] = z - o;
+      dirty = true;
+    }
+    // colour: invisible (nearly dead) cells snap to their target, visible ones fade
+    const tc = TINT[tint[i]], j3 = i * 3;
+    const dr = tc.r - c[j3], dg = tc.g - c[j3 + 1], db = tc.b - c[j3 + 2];
+    if (dr || dg || db) {
+      const f = s < 0.05 || force ? 1 : kc;
+      c[j3] += dr * f; c[j3 + 1] += dg * f; c[j3 + 2] += db * f;
+      if (Math.abs(dr) + Math.abs(dg) + Math.abs(db) < 0.004) { c[j3] = tc.r; c[j3 + 1] = tc.g; c[j3 + 2] = tc.b; }
+      cDirty = true;
+    }
+    td[i * 4] = c[j3]; td[i * 4 + 1] = c[j3 + 1]; td[i * 4 + 2] = c[j3 + 2]; td[i * 4 + 3] = s;
+  }
+  if (dirty) mesh.instanceMatrix.needsUpdate = true;
+  if (cDirty) mesh.instanceColor.needsUpdate = true;
+  if (dirty || cDirty) cellTex.needsUpdate = true;
+}
+
+function load(cells, n) {
+  const resized = n !== N || !mesh;
+  N = n; seed = cells; cur = Uint8Array.from(cells); nxt = new Uint8Array(n * n);
+  if (resized) buildGrid(n);
+  cellScale = Float32Array.from(cur);                  // snap to the new state, no animation
+  tint = new Uint8Array(n * n);
+  animateCells(0, true);
+  gen = 0; clearFx(); logEl.replaceChildren(); entries = []; draw(); detect(true);
+}
+
+/* ===================== Sound ===================== */
+// A tiny synth (Web Audio, no audio files). The rarer the pattern, the longer, brighter and louder the sound.
+const NOTE = m => 440 * 2 ** ((m - 69) / 12);                      // MIDI note number -> Hz
+
+function tone(c, out, t0, f, dur, type, gain, slideTo = 0) {
+  const o = c.createOscillator(), v = c.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f, t0);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+  v.gain.setValueAtTime(0.0001, t0);
+  v.gain.exponentialRampToValueAtTime(gain, t0 + 0.008);
+  v.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(v).connect(out);
+  o.start(t0); o.stop(t0 + dur + 0.02);
+}
+
+function whoosh(c, out, t0, dur, gain) {                            // rising noise sweep
+  const buf = c.createBuffer(1, Math.ceil(c.sampleRate * dur), c.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = c.createBufferSource(), bp = c.createBiquadFilter(), v = c.createGain();
+  src.buffer = buf;
+  bp.type = "bandpass"; bp.Q.value = 1.2;
+  bp.frequency.setValueAtTime(300, t0);
+  bp.frequency.exponentialRampToValueAtTime(5000, t0 + dur);
+  v.gain.setValueAtTime(0.0001, t0);
+  v.gain.exponentialRampToValueAtTime(gain, t0 + dur * 0.7);
+  v.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(bp).connect(v).connect(out);
+  src.start(t0);
+}
+
+function voice(c, out, rank, t0) {
+  switch (rank) {
+    case 1:                                                         // a soft tick
+      tone(c, out, t0, NOTE(76), 0.07, "sine", 0.05);
+      break;
+    case 2:                                                         // two quick soft notes
+      tone(c, out, t0, NOTE(79), 0.1, "sine", 0.07);
+      tone(c, out, t0 + 0.06, NOTE(84), 0.12, "sine", 0.06);
+      break;
+    case 3:                                                         // chime
+      tone(c, out, t0, NOTE(76), 0.4, "triangle", 0.13);
+      tone(c, out, t0 + 0.09, NOTE(83), 0.45, "triangle", 0.12);
+      tone(c, out, t0 + 0.09, NOTE(95), 0.3, "sine", 0.04);
+      break;
+    case 4:                                                         // rising arpeggio
+      [72, 76, 79, 84].forEach((m, i) => {
+        tone(c, out, t0 + i * 0.075, NOTE(m), 0.4, "triangle", 0.14);
+        tone(c, out, t0 + i * 0.075, NOTE(m + 12), 0.25, "sine", 0.04);
+      });
+      break;
+    default:                                                        // fanfare: boom, whoosh, run, chord
+      tone(c, out, t0, 110, 0.7, "sine", 0.4, 38);
+      whoosh(c, out, t0, 0.6, 0.18);
+      [60, 64, 67, 72, 76, 79, 84].forEach((m, i) => {
+        tone(c, out, t0 + 0.05 + i * 0.06, NOTE(m), 0.5, "sawtooth", 0.06);
+        tone(c, out, t0 + 0.05 + i * 0.06, NOTE(m), 0.5, "triangle", 0.1);
+      });
+      [72, 76, 79, 84].forEach(m => {
+        tone(c, out, t0 + 0.5, NOTE(m), 1.3, "sawtooth", 0.05);
+        tone(c, out, t0 + 0.5, NOTE(m), 1.3, "triangle", 0.09);
+      });
+  }
+}
+
+let audio = null, master = null, soundOn = true;
+const lastPlayed = {};
+try { soundOn = localStorage.getItem("qrlife-sound") !== "off"; } catch (e) { /* storage unavailable: default on */ }
+
+// browsers only allow audio after a user gesture, so this is called from the start / button handlers
+function audioWake() {
+  if (!audio) {
+    audio = new (window.AudioContext || window.webkitAudioContext)();
+    const comp = audio.createDynamicsCompressor();                  // keeps simultaneous sounds from clipping
+    master = audio.createGain();
+    master.gain.value = 0.7;
+    master.connect(comp).connect(audio.destination);
+  }
+  if (audio.state === "suspended") audio.resume();
+}
+
+function playRank(rank) {
+  if (!soundOn || !audio || audio.state !== "running") return;
+  const now = performance.now(), gap = rank <= 2 ? 120 : 0;         // frequent small finds must not machine-gun
+  if (now - (lastPlayed[rank] || -1e9) < gap) return;
+  lastPlayed[rank] = now;
+  voice(audio, master, rank, audio.currentTime);
+}
+
+/* ===================== Effects ===================== */
+// New pattern -> rank 3+: the game freezes for a moment, then carries on. rank 3: ripple; rank 4: double ripple + screen shake;
+// rank 5: triple ripple, particles, flash, shake, name label, and a glow while it lives.
+const REDUCED_MOTION = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const toWorld = (cx, cy) => [cx - (N / 2 - 0.5), cy - (N / 2 - 0.5)];
+
+const softTex = (() => {
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const g = c.getContext("2d"), grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, "rgba(255,255,255,1)");
+  grad.addColorStop(0.45, "rgba(255,255,255,.45)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = grad; g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+})();
+const ringGeo = new THREE.RingGeometry(0.94, 1, 72);
+const planeGeo = new THREE.PlaneGeometry(1, 1);
+
+let fx = [], fading = [], clock = 0;     // fx: running one-shot effects; fading: glows of vanished patterns
+
+function clearFx() {
+  fx.forEach(e => e.kill());
+  fx = [];
+  for (const p of tracked) if (p.glow) fading.push(p.glow);
+  tracked = [];
+  fading.forEach(disposeGlow);
+  fading = [];
+}
+
+function addRipple(x, z, rank, size, delay = 0) {
+  const mat = new THREE.MeshBasicMaterial({ color: TINT[rank], transparent: true, depthWrite: false, opacity: 0 });
+  const m = new THREE.Mesh(ringGeo, mat);
+  m.rotation.x = -Math.PI / 2; m.position.set(x, 0.8, z); m.visible = false;
+  scene.add(m);
+  const reach = 5 + rank * 3, dur = 0.9 + rank * 0.1;
+  let t = -delay;
+  const kill = () => { scene.remove(m); mat.dispose(); };
+  fx.push({
+    kill,
+    tick(dt) {
+      t += dt;
+      if (t < 0) return true;
+      const p = t / dur;
+      if (p >= 1) { kill(); return false; }
+      m.visible = true;
+      m.scale.setScalar(size * 0.5 + (1 - (1 - p) ** 3) * reach);
+      mat.opacity = 0.9 * (1 - p);
+      return true;
+    },
+  });
+}
+
+function addBurst(x, z, rank, size) {
+  const n = rank >= 5 ? 80 : 30, pos = new Float32Array(n * 3), vel = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 5 + Math.random() * (rank >= 5 ? 14 : 9), r = Math.random() * size * 0.4;
+    pos.set([x + Math.cos(a) * r, 0.9, z + Math.sin(a) * r], i * 3);
+    vel.set([Math.cos(a) * sp, 2 + Math.random() * 4, Math.sin(a) * sp], i * 3);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({
+    color: TINT[rank], map: softTex, transparent: true, depthWrite: false,
+    sizeAttenuation: false, size: (rank >= 5 ? 14 : 10) * renderer.getPixelRatio(),
+  });
+  const pts = new THREE.Points(geo, mat);
+  pts.frustumCulled = false;
+  scene.add(pts);
+  const dur = 1.2;
+  let t = 0;
+  const kill = () => { scene.remove(pts); geo.dispose(); mat.dispose(); };
+  fx.push({
+    kill,
+    tick(dt) {
+      t += dt;
+      if (t >= dur) { kill(); return false; }
+      const damp = Math.exp(-dt * 2.5);
+      for (let i = 0; i < n; i++) {
+        pos[i * 3] += vel[i * 3] * dt; pos[i * 3 + 1] += vel[i * 3 + 1] * dt; pos[i * 3 + 2] += vel[i * 3 + 2] * dt;
+        vel[i * 3] *= damp; vel[i * 3 + 2] *= damp; vel[i * 3 + 1] -= 9 * dt;
+      }
+      geo.attributes.position.needsUpdate = true;
+      mat.opacity = 1 - t / dur;
+      return true;
+    },
+  });
+}
+
+function makeGlow(p) {
+  const mat = new THREE.MeshBasicMaterial({ map: softTex, color: TINT[p.rank], transparent: true, depthWrite: false, opacity: 0 });
+  const m = new THREE.Mesh(planeGeo, mat);
+  m.rotation.x = -Math.PI / 2;
+  const [x, z] = toWorld(p.cx, p.cy);
+  m.position.set(x, 0.03, z);
+  m.scale.setScalar(p.size + 6 + p.rank * 2);
+  scene.add(m);
+  return m;
+}
+function disposeGlow(m) { scene.remove(m); m.material.dispose(); }
+
+function tickGlows(dt) {
+  const k = 1 - Math.exp(-dt * 12), kf = 1 - Math.exp(-dt * 6), pulse = 0.5 + 0.5 * Math.sin(clock * 5);
+  for (const p of tracked) {
+    const m = p.glow;
+    if (!m) continue;
+    const [x, z] = toWorld(p.cx, p.cy), s = p.size + 6 + p.rank * 2;
+    // wrapped around the board: jump instead of sliding across it
+    if (Math.abs(x - m.position.x) > N / 2) m.position.x = x;
+    if (Math.abs(z - m.position.z) > N / 2) m.position.z = z;
+    m.position.x += (x - m.position.x) * k;
+    m.position.z += (z - m.position.z) * k;
+    m.scale.x += (s - m.scale.x) * k; m.scale.y = m.scale.x;
+    m.material.opacity += ((p.rank >= 4 ? 0.55 + 0.2 * pulse : 0.4 + 0.12 * pulse) - m.material.opacity) * kf;
+  }
+  for (let i = fading.length - 1; i >= 0; i--) {
+    const m = fading[i];
+    m.material.opacity -= m.material.opacity * kf;
+    if (m.material.opacity < 0.01) { disposeGlow(m); fading.splice(i, 1); }
+  }
+}
+
+function showLabel(name, x, z, rank) {
+  camera.updateMatrixWorld();
+  const v = new THREE.Vector3(x, 1, z).project(camera);
+  const el = document.createElement("div");
+  el.className = "fx-label";
+  el.textContent = name;
+  el.style.left = Math.min(80, Math.max(20, (v.x * 0.5 + 0.5) * 100)) + "%";
+  el.style.top = Math.min(88, Math.max(12, (-v.y * 0.5 + 0.5) * 100)) + "%";
+  el.style.borderColor = RANK_COLORS[rank];
+  life.appendChild(el);
+  el.animate([
+    { opacity: 0, transform: "translate(-50%,-30%) scale(.8)" },
+    { opacity: 1, transform: "translate(-50%,-90%) scale(1)", offset: 0.15 },
+    { opacity: 1, transform: "translate(-50%,-110%) scale(1)", offset: 0.75 },
+    { opacity: 0, transform: "translate(-50%,-140%) scale(1)" },
+  ], { duration: 1900, easing: "ease-out" }).onfinish = () => el.remove();
+}
+
+function flash(rank) {
+  const el = document.createElement("div");
+  el.className = "fx-flash";
+  el.style.background = RANK_COLORS[rank];
+  life.appendChild(el);
+  el.animate([{ opacity: 0.4 }, { opacity: 0 }], { duration: 650, easing: "ease-out" }).onfinish = () => el.remove();
+}
+
+function shake() {
+  life.animate([
+    { transform: "translate(0,0)" }, { transform: "translate(-4px,2px)" }, { transform: "translate(4px,-2px)" },
+    { transform: "translate(-3px,-2px)" }, { transform: "translate(2px,3px)" }, { transform: "translate(0,0)" },
+  ], { duration: 380 });
+}
+
+// brief automatic pause (the stop button is untouched, so a manual pause is never overridden)
+let holdTimer = 0;
+function holdGame(ms) {
+  clearTimeout(holdTimer);
+  holding = true;
+  holdTimer = setTimeout(() => { holding = false; }, ms);
+}
+
+function celebrate(p) {
+  const [x, z] = toWorld(p.cx, p.cy), r = p.rank;
+  playRank(r);
+  if (r >= 3) holdGame(1000);
+  if (r >= 3) addRipple(x, z, r, p.size);
+  if (r >= 4) addRipple(x, z, r, p.size, 0.15);
+  if (r >= 5) addRipple(x, z, r, p.size, 0.3);
+  if (r >= 5) addBurst(x, z, r, p.size);
+  if (r >= 4 && !REDUCED_MOTION) shake();
+  if (r >= 5 && !REDUCED_MOTION) { flash(r); showLabel(patName(p.name), x, z, r); }
+}
+
+function tickFx(dt) {
+  clock += dt;
+  for (let i = fx.length - 1; i >= 0; i--) if (!fx[i].tick(dt)) fx.splice(i, 1);
+  tickGlows(dt);
+}
+
+function draw() {
+  $("gen").textContent = gen;
+}
+
+function lifeStep(src, dst, n) {
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    let c = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++)
+      if (dx || dy) c += src[((y + dy + n) % n) * n + (x + dx + n) % n];
+    const i = y * n + x;
+    dst[i] = c === 3 || (src[i] && c === 2) ? 1 : 0;
+  }
+}
+
+function step() {
+  lifeStep(cur, nxt, N);
+  [cur, nxt] = [nxt, cur];
+  gen++;
+  detect();
+}
+
+/* ---- famous patterns ---- */
+const PATTERNS = [
+  ["block", 1, 1, "OO/OO"],
+  ["beehive", 1, 1, ".OO./O..O/.OO."],
+  ["loaf", 2, 1, ".OO./O..O/.O.O/..O."],
+  ["boat", 2, 1, "OO./O.O/.O."],
+  ["ship", 3, 1, "OO./O.O/.OO"],
+  ["tub", 2, 1, ".O./O.O/.O."],
+  ["pond", 3, 1, ".OO./O..O/O..O/.OO."],
+  ["blinker", 1, 2, "OOO"],
+  ["toad", 2, 2, ".OOO/OOO."],
+  ["beacon", 3, 2, "OO../OO../..OO/..OO"],
+  ["pulsar", 5, 3, "..OOO...OOO../............./O....O.O....O/O....O.O....O/O....O.O....O/..OOO...OOO../............./..OOO...OOO../O....O.O....O/O....O.O....O/O....O.O....O/............./..OOO...OOO.."],
+  ["glider", 4, 4, ".O./..O/OOO"],
+  ["lwss", 5, 4, "O..O./....O/O...O/.OOOO"],
+];
+
+// cell list -> orientation-independent-of-position key
+const cellKey = cells => {
+  const mx = Math.min(...cells.map(c => c[0])), my = Math.min(...cells.map(c => c[1]));
+  return cells.map(c => (c[1] - my) * 1000 + (c[0] - mx)).sort((a, b) => a - b).join(",");
+};
+const SYMS = [(x, y) => [x, y], (x, y) => [-x, y], (x, y) => [x, -y], (x, y) => [-x, -y],
+              (x, y) => [y, x], (x, y) => [-y, x], (x, y) => [y, -x], (x, y) => [-y, -x]];
+
+// every phase x every rotation/reflection -> name (phases are produced by simulating the pattern)
+const KNOWN = new Map();
+const RANK = {};
+for (const [name, rank, period, art] of PATTERNS) {
+  RANK[name] = rank;
+  const G = 48, a = new Uint8Array(G * G), b = new Uint8Array(G * G);
+  art.split("/").forEach((row, y) => [...row].forEach((ch, x) => { if (ch === "O") a[(y + 16) * G + x + 16] = 1; }));
+  let s = a, t = b;
+  for (let p = 0; p < period; p++) {
+    const cells = [];
+    s.forEach((v, i) => { if (v) cells.push([i % G, Math.floor(i / G)]); });
+    for (const f of SYMS) KNOWN.set(cellKey(cells.map(([x, y]) => f(x, y))), name);
+    lifeStep(s, t, G); [s, t] = [t, s];
+  }
+}
+
+// groups of live cells (cells within 2 squares belong together), matched against KNOWN
+function groups(grid, n) {
+  const seen = new Uint8Array(n * n), out = [];
+  for (let i = 0; i < grid.length; i++) {
+    if (!grid[i] || seen[i]) continue;
+    // The board is a torus, so a group can straddle an edge. Each cell carries "unwrapped"
+    // coordinates [x, y] (relative to the group's first cell, may fall outside 0..n-1) plus its
+    // real board index as a third element.
+    const x0 = i % n, y0 = (i - x0) / n, cells = [], stack = [[x0, y0]];
+    seen[i] = 1;
+    while (stack.length) {
+      const [ux, uy] = stack.pop();
+      cells.push([ux, uy, (((uy % n) + n) % n) * n + (((ux % n) + n) % n)]);
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const vx = ux + dx, vy = uy + dy, k = (((vy % n) + n) % n) * n + (((vx % n) + n) % n);
+        if (grid[k] && !seen[k]) { seen[k] = 1; stack.push([vx, vy]); }
+      }
+    }
+    out.push(cells);
+  }
+  return out;
+}
+
+// every recognised pattern on the board right now (also paints `tint` by rank)
+function findPatterns() {
+  const found = [];
+  tint.fill(0);
+  for (const cells of groups(cur, N)) {
+    if (cells.length > 100) continue;
+    const name = KNOWN.get(cellKey(cells));
+    if (!name) continue;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [x, y, idx] of cells) {
+      tint[idx] = RANK[name];                            // colour the pattern by its rank
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    }
+    const mod = v => ((v % N) + N) % N;                  // centre of a group straddling an edge is brought back on board
+    found.push({ name, rank: RANK[name], cx: mod((x0 + x1) / 2), cy: mod((y0 + y1) / 2), size: Math.max(x1 - x0, y1 - y0) + 1 });
+  }
+  return found;
+}
+
+// Follow patterns from generation to generation: one that shows up where none of the same kind
+// was a moment ago is "new" -> log it and (unless silent) celebrate it.
+//
+// Movers (glider, LWSS) are followed more carefully: the board wraps around, so one can vanish
+// off an edge (or be unrecognisable while touching other cells) and come back elsewhere. A lost
+// pattern is therefore remembered for a while, and may reappear within the distance it could
+// have travelled in the meantime (edge wrap-around included) without counting as new.
+const SPEED = { glider: 0.3, lwss: 0.55 };   // cells per generation, upper bound
+const MEMORY = p => (SPEED[p.name] ? 30 : 6);                              // generations a lost pattern is remembered
+let tracked = [];
+function detect(silent = false) {
+  const wrap = (a, b) => { const d = Math.abs(a - b); return Math.min(d, N - d); };
+  const pool = tracked.slice(), next = [], added = {};
+  for (const it of findPatterns()) {
+    let best = -1, bd = Infinity;
+    pool.forEach((p, i) => {
+      if (p.name !== it.name) return;
+      const d = Math.hypot(wrap(p.cx, it.cx), wrap(p.cy, it.cy));
+      if (d < 2.6 + p.missed * (SPEED[p.name] || 0) && d < bd) { bd = d; best = i; }
+    });
+    if (best >= 0) {
+      const p = pool.splice(best, 1)[0];
+      p.cx = it.cx; p.cy = it.cy; p.size = it.size; p.missed = 0;
+      next.push(p);
+    } else {
+      it.missed = 0;
+      if (it.rank >= 5) it.glow = makeGlow(it);
+      next.push(it);
+      added[it.name] = (added[it.name] || 0) + 1;
+      if (!silent) celebrate(it);
+    }
+  }
+  for (const p of pool) {                                // not seen this generation
+    if (++p.missed <= MEMORY(p)) next.push(p);
+    else if (p.glow) fading.push(p.glow);
+  }
+  tracked = next;
+  for (const name in added) log(name, added[name]);
+}
+
+/* ===================== Language + pictograms ===================== */
+// English is the default; add another language by adding an entry here (the globe button cycles through them).
+const I18N = {
+  en: {
+    label: "EN",
+    placeholder: "Type text or a URL…", start: "Start", qr: "QR code preview",
+    hint: "Press ↵ Enter or ▶ to turn the QR code into Life",
+    tooLong: n => `Too long (max ${n} bytes)`,
+    note: "Type something, then press ↵",
+    board: "Game of Life", zoom: "Scroll to zoom · double-click to reset",
+    gen: "Generation", soundOn: "Sound on", soundOff: "Sound off", viewDrop: "Droplet view", viewCells: "Cell view",
+    pause: "Pause", resume: "Resume", restart: "Restart", lang: "Language",
+    logLabel: "Detected patterns", logEmpty: "Patterns you find will appear here",
+    rarity: r => `Rarity ${r} / 5`,
+    names: { block: "Block", beehive: "Beehive", loaf: "Loaf", boat: "Boat", ship: "Ship", tub: "Tub", pond: "Pond",
+             blinker: "Blinker", toad: "Toad", beacon: "Beacon", pulsar: "Pulsar", glider: "Glider", lwss: "Lightweight spaceship" },
+  },
+  ja: {
+    label: "JA",
+    placeholder: "文字やURLを入力…", start: "開始", qr: "QRコードのプレビュー",
+    hint: "↵ Enter か ▶ で、QRコードがライフゲームになります",
+    tooLong: n => `長すぎます（最大 ${n} バイト）`,
+    note: "入力して ↵ で開始",
+    board: "ライフゲーム", zoom: "ホイールで拡大縮小 · ダブルクリックで元に戻す",
+    gen: "世代", soundOn: "音あり", soundOff: "音なし", viewDrop: "水滴表示", viewCells: "セル表示",
+    pause: "一時停止", resume: "再開", restart: "最初から", lang: "言語",
+    logLabel: "検出したパターン", logEmpty: "見つけたパターンがここに表示されます",
+    rarity: r => `レア度 ${r} / 5`,
+    names: { block: "ブロック", beehive: "ビーハイブ", loaf: "ローフ", boat: "ボート", ship: "シップ", tub: "タブ", pond: "ポンド",
+             blinker: "ブリンカー", toad: "ヒキガエル", beacon: "ビーコン", pulsar: "パルサー", glider: "グライダー", lwss: "軽量宇宙船" },
+  },
+};
+let lang = "en";
+try { const l = localStorage.getItem("qrlife-lang"); if (I18N[l]) lang = l; } catch (e) { /* storage unavailable */ }
+const T = () => I18N[lang];
+const patName = id => T().names[id];
+
+const svg = (body, size = 20) =>
+  `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+const SPK = '<path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" fill="currentColor"/>';
+const ICON = {
+  play: size => svg('<path d="M7 4.5v15l12-7.5z" fill="currentColor"/>', size),
+  pause: size => svg('<rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/>', size),
+  restart: size => svg('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v5h5"/>', size),
+  soundOn: size => svg(SPK + '<path d="M15.5 9a4.5 4.5 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/>', size),
+  drop: size => svg('<path d="M12 3c3.6 4.3 6 7.3 6 10.5a6 6 0 0 1-12 0C6 10.3 8.4 7.3 12 3z" fill="currentColor"/>', size),
+  cells: size => svg('<g fill="currentColor" stroke="none"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></g>', size),
+  soundOff: size => svg(SPK + '<path d="M16 9.5l5 5M21 9.5l-5 5"/>', size),
+  globe: size => svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.8 2.5 4 5.6 4 9s-1.2 6.5-4 9c-2.8-2.5-4-5.6-4-9s1.2-6.5 4-9z"/>', size),
+  // the Life "glider": stands for "generation"
+  glider: size => svg('<g fill="currentColor" stroke="none"><rect x="9" y="2" width="6" height="6" rx="1"/><rect x="16" y="9" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/></g>', size),
+};
+
+const goBtn = $("go"), hint = $("hint"), toggleBtn = $("toggle"), resetBtn = $("reset"), sndBtn = $("snd"), langBtn = $("lang"), viewBtn = $("view");
+let pending = null;                  // QR of the text now in the box (null: empty or too long)
+let hintState = { tooLong: 0 };      // tooLong: the byte limit to show, or 0
+
+// when the log is full, the lowest-ranked entry (oldest first) is dropped, so rare finds stay
+const LOG_MAX = 20;
+let entries = [];
+function fillLogItem(e) {
+  e.li.innerHTML = `<span class="g">${ICON.glider(12)}${e.gen}</span>` +
+    `<span class="s" title="${T().rarity(e.rank)}">${"★".repeat(e.rank)}<i>${"★".repeat(5 - e.rank)}</i></span>` +
+    `<span class="n">${patName(e.id)}</span>${e.count > 1 ? `<span class="g">×${e.count}</span>` : ""}`;
+}
+function log(id, count) {
+  const rank = RANK[id], li = document.createElement("li");
+  li.className = "r" + rank;
+  const e = { id, rank, li, gen, count };
+  fillLogItem(e);
+  logEl.prepend(li);
+  entries.push(e);
+  if (entries.length > LOG_MAX) {
+    let k = 0;
+    for (let i = 1; i < entries.length - 1; i++) if (entries[i].rank < entries[k].rank) k = i;
+    entries.splice(k, 1)[0].li.remove();
+  }
+}
+
+function renderHint() {
+  hint.textContent = hintState.tooLong ? T().tooLong(hintState.tooLong) : T().hint;
+  hint.classList.toggle("err", !!hintState.tooLong);
+}
+function syncButtons() {
+  const t = T();
+  toggleBtn.innerHTML = running ? ICON.pause() : ICON.play();
+  toggleBtn.title = running ? t.pause : t.resume;
+  toggleBtn.setAttribute("aria-label", toggleBtn.title);
+  toggleBtn.disabled = resetBtn.disabled = !hasQR;
+}
+function syncView() {
+  const t = T();
+  viewBtn.innerHTML = dropletOn ? ICON.drop() : ICON.cells();
+  viewBtn.title = dropletOn ? t.viewDrop : t.viewCells;
+  viewBtn.setAttribute("aria-label", viewBtn.title);
+  viewBtn.setAttribute("aria-pressed", dropletOn);
+}
+function syncSound() {
+  const t = T();
+  sndBtn.innerHTML = soundOn ? ICON.soundOn() : ICON.soundOff();
+  sndBtn.title = soundOn ? t.soundOn : t.soundOff;
+  sndBtn.setAttribute("aria-label", sndBtn.title);
+  sndBtn.setAttribute("aria-pressed", soundOn);
+}
+// (re)writes every piece of text and every icon for the current language
+function applyLang() {
+  const t = T();
+  document.documentElement.lang = lang;
+  text.placeholder = t.placeholder;
+  goBtn.innerHTML = ICON.play(22);
+  goBtn.title = t.start;
+  goBtn.setAttribute("aria-label", t.start);
+  qrCanvas.setAttribute("aria-label", t.qr);
+  note.textContent = t.note;
+  life.setAttribute("aria-label", t.board);
+  life.title = t.zoom;
+  $("genicon").innerHTML = ICON.glider(16);
+  $("genbox").title = t.gen;
+  resetBtn.innerHTML = ICON.restart();
+  resetBtn.title = t.restart;
+  resetBtn.setAttribute("aria-label", t.restart);
+  langBtn.innerHTML = ICON.globe(18) + `<span>${t.label}</span>`;
+  langBtn.title = t.lang;
+  langBtn.setAttribute("aria-label", t.lang);
+  logEl.setAttribute("aria-label", t.logLabel);
+  logEl.dataset.empty = t.logEmpty;
+  entries.forEach(fillLogItem);
+  renderHint();
+  syncButtons();
+  syncSound();
+  syncView();
+}
+
+/* ---- input -> QR preview -> start ---- */
+// typing only refreshes the small QR; the game on the board is left alone until "start"
+function preview() {
+  const bytes = enc.encode(text.value), c = qrCanvas.getContext("2d");
+  pending = null;
+  hintState.tooLong = 0;
+  if (!bytes.length) {
+    qrCanvas.width = qrCanvas.height = 1;
+    c.fillStyle = "#fff"; c.fillRect(0, 0, 1, 1);
+    renderHint();
+    return;
+  }
+  let qr;
+  try { qr = QR.encode(bytes, 1); }
+  catch (e) { hintState.tooLong = QR.maxBytes(40, 1); renderHint(); return; }
+  pending = qr;
+  const q = 4, n = qr.size + q * 2;     // with quiet zone
+  qrCanvas.width = qrCanvas.height = n;
+  c.fillStyle = "#fff"; c.fillRect(0, 0, n, n); c.fillStyle = "#000";
+  for (let y = 0; y < qr.size; y++) for (let x = 0; x < qr.size; x++)
+    if (qr.modules[y * qr.size + x]) c.fillRect(x + q, y + q, 1, 1);
+  renderHint();
+}
+
+// life seed: the QR centred in an empty field; always (re)starts from the text in the box
+function start() {
+  audioWake();
+  if (!pending) { text.focus(); return; }
+  const qr = pending, g = qr.size + PAD * 2, cells = new Uint8Array(g * g);
+  for (let y = 0; y < qr.size; y++) for (let x = 0; x < qr.size; x++)
+    cells[(y + PAD) * g + x + PAD] = qr.modules[y * qr.size + x];
+  load(cells, g);
+  hasQR = true; holding = false; running = true;
+  note.hidden = true;
+  syncButtons();
+}
+
+let last = 0, lastT = 0;
+function frame(t) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.1, (t - (lastT || t)) / 1000);
+  lastT = t;
+  if (running && !holding && hasQR && t - last >= 1000 / FPS) { last = t; step(); draw(); }
+  animateCells(dt);
+  tickFx(dt);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+text.addEventListener("input", preview);
+text.addEventListener("keydown", e => {
+  // Enter while an IME is converting text only confirms the conversion
+  if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); start(); }
+});
+goBtn.onclick = start;
+viewBtn.onclick = () => {
+  dropletOn = !dropletOn;
+  try { localStorage.setItem("qrlife-view", dropletOn ? "drop" : "cells"); } catch (e) { /* ignore */ }
+  applyView();
+  syncView();
+};
+sndBtn.onclick = () => {
+  soundOn = !soundOn;
+  try { localStorage.setItem("qrlife-sound", soundOn ? "on" : "off"); } catch (e) { /* ignore */ }
+  audioWake();
+  syncSound();
+  if (soundOn) playRank(3);                           // short sample so the toggle gives feedback
+};
+langBtn.onclick = () => {
+  const codes = Object.keys(I18N);
+  lang = codes[(codes.indexOf(lang) + 1) % codes.length];
+  try { localStorage.setItem("qrlife-lang", lang); } catch (e) { /* ignore */ }
+  applyLang();
+};
+toggleBtn.onclick = () => { running = !running; syncButtons(); };
+resetBtn.onclick = () => { audioWake(); load(seed, N); holding = false; running = true; syncButtons(); };
+
+load(new Uint8Array(45 * 45), 45);   // empty board until the first start
+applyLang();
+preview();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
