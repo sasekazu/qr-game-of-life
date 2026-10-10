@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR Life Battle</title>
+<style>
+  :root { --bg:#f2f2f2; --card:#fff; --ink:#111; --sub:#8a8a8a; --line:#e2e2e2; --p1:#111; --p2:#c9c9c9; --board:#f0f0f0; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 "Inter", system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+    display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 24px 12px 40px;
+  }
+  h1 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: var(--sub); }
+
+  /* ---- the two sides ---- */
+  .arena { position: relative; width: min(100%, 1060px); display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  .vs {
+    position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); z-index: 3; pointer-events: none;
+    width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--ink); color: #fff; font-size: 13px; font-weight: 700; letter-spacing: .06em;
+    box-shadow: 0 0 0 4px var(--bg);
+  }
+  .panel {
+    min-width: 0; background: var(--card); border-radius: 20px; padding: 12px; position: relative;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 32px rgba(0,0,0,.06); transition: opacity .3s, box-shadow .3s;
+  }
+  .panel.win { box-shadow: 0 0 0 3px var(--ink), 0 8px 32px rgba(0,0,0,.12); }
+  .panel.lose { opacity: .6; }
+  .phead { display: flex; align-items: center; gap: 8px; padding: 0 2px 8px; }
+  .badge { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; flex: none; }
+  .b1 { background: var(--p1); color: #fff; }
+  .b2 { background: var(--p2); color: var(--ink); }
+  .pname { font-weight: 600; font-size: 14px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .count { font-size: 12.5px; color: var(--sub); font-variant-numeric: tabular-nums; flex: none; }
+  .count.full { color: var(--ink); font-weight: 600; }
+  .prow { display: flex; gap: 8px; align-items: center; }
+  .prow input {
+    flex: 1; min-width: 0; height: 44px; border: 0; outline: 0; padding: 0 14px; font: inherit; font-size: 15px;
+    color: var(--ink); background: #f4f4f4; border-radius: 12px;
+  }
+  .prow input:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+  .prow input:disabled { opacity: .55; }
+  .prow input::placeholder { color: var(--sub); }
+  .qr { width: 44px; height: 44px; flex: none; image-rendering: pixelated; border-radius: 8px; border: 1px solid var(--line); background: #fff; }
+  .stage { position: relative; margin-top: 10px; border-radius: 12px; background: var(--board); border: 2px solid #c4c4c4; overflow: hidden; }
+  .board { display: block; width: 100%; aspect-ratio: 1; }
+  .labels { position: absolute; inset: 0; pointer-events: none; }
+  .fx-label {
+    position: absolute; pointer-events: none; white-space: nowrap; padding: 4px 12px; border-radius: 999px; border: 2px solid;
+    background: var(--ink); color: #fff; font-size: 13px; font-weight: 700; letter-spacing: .03em;
+  }
+  .progress { position: relative; height: 5px; margin: 10px 0 0; border-radius: 999px; background: #e9e9e9; overflow: hidden; }
+  .progress i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--ink); border-radius: 999px; transition: width .12s linear; }
+  .progress.final i { background: #a855f7; }
+  .progress.final:not(.done) i { animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+  .pfoot { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 8px 2px 0; }
+  .score { display: inline-flex; align-items: center; gap: 6px; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .score svg { flex: none; }
+  .score b.bump { display: inline-block; animation: bump .4s ease-out; }
+  @keyframes bump { 0% { transform: scale(1.5); } 100% { transform: scale(1); } }
+  .note { font-size: 12px; color: var(--sub); text-align: right; min-width: 0; }
+
+  /* ---- controls under the arena ---- */
+  .controls { width: min(100%, 1060px); display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .meter { width: min(100%, 520px); }
+  .meter .bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: #e2e2e2; }
+  .meter .bar i { display: block; height: 100%; transition: width .3s; }
+  .meter .m1 { background: var(--p1); }
+  .meter .m2 { background: var(--p2); }
+  .meter .cap { text-align: center; margin-top: 6px; font-size: 13px; color: var(--sub); font-variant-numeric: tabular-nums; }
+  .meter .cap b { color: var(--ink); }
+  .btns { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .gen { display: inline-flex; align-items: center; gap: 7px; color: var(--sub); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; margin-right: 6px; }
+  button {
+    font: inherit; font-size: 13px; cursor: pointer; border: 0; padding: 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    background: var(--ink); color: #fff; border-radius: 12px;
+  }
+  button svg { display: block; }
+  button.ghost { background: #efefef; color: var(--ink); }
+  button.icon { width: 40px; height: 40px; }
+  button.lang { height: 40px; padding: 0 12px; font-size: 12px; font-weight: 600; letter-spacing: .04em; }
+  button.go { width: 64px; height: 48px; border-radius: 14px; }
+  button:not(:disabled):hover { opacity: .85; }
+  button:disabled { opacity: .35; cursor: default; }
+  button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .hint { margin: 0; font-size: 12.5px; color: var(--sub); text-align: center; }
+  .hint.err { color: var(--ink); font-weight: 600; }
+
+  /* ---- result dialog ---- */
+  dialog { border: 0; border-radius: 20px; padding: 24px; width: min(92vw, 420px); color: var(--ink); background: var(--card); box-shadow: 0 24px 64px rgba(0,0,0,.28); text-align: center; }
+  dialog::backdrop { background: rgba(17,17,17,.4); }
+  dialog h2 { margin: 8px 0 14px; font-size: 22px; }
+  .rrow { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #f4f4f4; margin-top: 8px; text-align: left; }
+  .rrow.win { background: var(--ink); color: #fff; }
+  .rrow .score { font-size: 22px; margin-left: auto; }
+  .rrow .why { font-size: 12px; opacity: .65; }
+  .rbtns { display: flex; justify-content: center; gap: 10px; margin-top: 18px; }
+  .rbtns button { height: 42px; padding: 0 18px; }
+
+  @media (max-width: 640px) {
+    body { padding: 16px 8px 32px; gap: 10px; }
+    .arena { gap: 12px; }
+    .vs { width: 34px; height: 34px; font-size: 11px; top: 36%; }
+    .panel { padding: 8px; border-radius: 16px; }
+    .prow input { height: 38px; font-size: 14px; padding: 0 10px; }
+    .qr { width: 38px; height: 38px; }
+    .score { font-size: 20px; }
+    .pname { font-size: 12.5px; }
+    .fx-label { font-size: 11px; padding: 3px 9px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .progress i, .score b { animation: none !important; transition: none; } }
+</style>
+</head>
+<body>
+  <h1 id="title">QR Life · Battle</h1>
+
+  <main class="arena" id="arena">
+    <section class="panel" id="panel1"></section>
+    <section class="panel" id="panel2"></section>
+    <div class="vs">VS</div>
+  </main>
+
+  <section class="controls">
+    <div class="meter" id="meter">
+      <div class="bar"><i class="m1" id="m1" style="width:50%"></i><i class="m2" id="m2" style="width:50%"></i></div>
+      <div class="cap" id="cap"></div>
+    </div>
+    <div class="btns">
+      <span class="gen" id="genbox"><span id="genicon"></span><span id="gen">0</span><span id="genMax"></span></span>
+      <button id="cls" class="ghost icon"></button>
+      <button id="lang" class="ghost lang"></button>
+      <button id="pause" class="ghost icon" disabled></button>
+      <button id="start" class="go" disabled></button>
+    </div>
+    <p class="hint" id="hint"></p>
+  </section>
+
+  <dialog id="result">
+    <div id="rIcon"></div>
+    <h2 id="rTitle"></h2>
+    <div id="rRows"></div>
+    <div class="rbtns">
+      <button id="rClose" class="ghost"></button>
+      <button id="rNew" class="ghost"></button>
+      <button id="rRematch"></button>
+    </div>
+  </dialog>
+
+<script src="engine.js"></script>
+<script>
+"use strict";
+const E = QRLifeEngine;
+const $ = id => document.getElementById(id);
+const FPS = +new URLSearchParams(location.search).get("fps") || 12;   // ?fps=240 speeds a battle up for testing
+const GHOST = "#c6c6c6";
+const REDUCED_MOTION = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const enc = new TextEncoder();
+
+/* ===================== language + pictograms ===================== */
+const I18N = {
+  en: {
+    label: "EN", title: "QR Life · Battle",
+    player: n => `Player ${n}`, placeholder: "Type text…",
+    hint: "Both players type a text, then press ▶ (or ↵ Enter)",
+    needBoth: "Both players need a text first",
+    tooLong: n => `A text is too long (max ${n} bytes)`,
+    start: "Start battle", restart: "Restart battle", pause: "Pause", resume: "Resume", lang: "Language", gen: "Generation",
+    classSmall: "Small board", classLarge: "Large board", upTo: n => `up to ${n} bytes`,
+    even: "Even", leads: (n, d) => `Player ${n} leads by ${d}`,
+    wins: n => `Player ${n} wins!`, draw: "It's a draw!", rematch: "Rematch", newTexts: "New texts", close: "Close",
+    endLimit: g => `${g} generations`, endSettled: g => `settled at generation ${g}`, rarity: r => `Rarity ${r} / 5`,
+  },
+  ja: {
+    label: "JA", title: "QR Life · 対戦",
+    player: n => `プレイヤー${n}`, placeholder: "文字を入力…",
+    hint: "2人とも文字を入力して、▶（または ↵ Enter）で開始",
+    needBoth: "先に2人とも文字を入力してください",
+    tooLong: n => `長すぎる文字があります（最大 ${n} バイト）`,
+    start: "対戦開始", restart: "最初からやり直す", pause: "一時停止", resume: "再開", lang: "言語", gen: "世代",
+    classSmall: "小さい盤面", classLarge: "大きい盤面", upTo: n => `最大 ${n} バイト`,
+    even: "互角", leads: (n, d) => `プレイヤー${n}が${d}点リード`,
+    wins: n => `プレイヤー${n}の勝ち！`, draw: "引き分け！", rematch: "再戦", newTexts: "文字を変える", close: "閉じる",
+    endLimit: g => `${g}世代`, endSettled: g => `${g}世代で繰り返し`, rarity: r => `レア度 ${r} / 5`,
+  },
+};
+let lang = "en";
+try { const l = localStorage.getItem("qrlife-lang"); if (I18N[l]) lang = l; } catch (e) { /* storage unavailable */ }
+const T = () => I18N[lang];
+
+const svg = (body, size = 20) =>
+  `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+const ICON = {
+  play: s => svg('<path d="M7 4.5v15l12-7.5z" fill="currentColor"/>', s),
+  pause: s => svg('<rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/>', s),
+  restart: s => svg('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v5h5"/>', s),
+  globe: s => svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.8 2.5 4 5.6 4 9s-1.2 6.5-4 9c-2.8-2.5-4-5.6-4-9s1.2-6.5 4-9z"/>', s),
+  trophy: s => svg('<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4"/><path d="M12 13v4M8 20h8M10 17h4"/>', s),
+  glider: s => svg('<g fill="currentColor" stroke="none"><rect x="9" y="2" width="6" height="6" rx="1"/><rect x="16" y="9" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/></g>', s),
+  grid: (n, s) => {
+    const cell = 20 / (n + (n - 1) * 0.5), gap = cell * 0.5;
+    let r = "";
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++)
+      r += `<rect x="${2 + x * (cell + gap)}" y="${2 + y * (cell + gap)}" width="${cell}" height="${cell}" rx="${cell * 0.2}"/>`;
+    return svg(`<g fill="currentColor" stroke="none">${r}</g>`, s);
+  },
+};
+
+/* ===================== board class ===================== */
+let boardClass = "small";
+try { const c = localStorage.getItem("qrlife-class"); if (c in E.BOARD_CLASSES) boardClass = c; } catch (e) { /* ignore */ }
+const maxBytes = () => E.maxBytes(boardClass);
+
+/* ===================== the two players ===================== */
+const players = [1, 2].map(i => {
+  const root = $("panel" + i);
+  root.innerHTML = `
+    <div class="phead"><span class="badge b${i}">P${i}</span><span class="pname"></span><span class="count"></span></div>
+    <div class="prow"><input type="text" spellcheck="false" autocomplete="off" enterkeyhint="go"><canvas class="qr" width="1" height="1"></canvas></div>
+    <div class="stage"><canvas class="board"></canvas><div class="labels"></div></div>
+    <div class="progress"><i></i></div>
+    <div class="pfoot"><span class="score"><span class="ti"></span><b>0</b></span><span class="note"></span></div>`;
+  const q = s => root.querySelector(s);
+  const board = q(".board");
+  return {
+    i, root, input: q("input"), count: q(".count"), qr: q(".qr"), board, ctx: board.getContext("2d"), labels: q(".labels"),
+    progress: q(".progress"), fill: q(".progress i"), score: q(".score b"), note: q(".note"), pname: q(".pname"),
+    seed: null,          // { n, cells } of the text in the box, or null when it is empty / too long
+    game: null,          // the running game
+    rings: [],           // expanding rings on the board (effects)
+    lastValue: "",       // the text before the latest edit (for the length limit)
+  };
+});
+
+let state = "idle";      // "idle": previewing; "running": a battle (maybe paused); "over": finished
+let running = false;     // false while paused
+let gen = 0;
+
+/* ---- text boxes: the QR preview, the byte limit ---- */
+const byteLen = s => enc.encode(s).length;
+function enforceLimit(p) {                // whatever would go over the limit is cut at a character boundary
+  const max = maxBytes(), input = p.input, now = input.value;
+  if (byteLen(now) <= max || byteLen(now) <= byteLen(p.lastValue)) return;
+  const last = p.lastValue;
+  let a = 0;
+  while (a < last.length && a < now.length && last[a] === now[a]) a++;
+  let b = 0;
+  while (b < last.length - a && b < now.length - a && last[last.length - 1 - b] === now[now.length - 1 - b]) b++;
+  const isHigh = c => c >= 0xd800 && c <= 0xdbff, isLow = c => c >= 0xdc00 && c <= 0xdfff;
+  if (a && isHigh(now.charCodeAt(a - 1))) a--;
+  if (b && isLow(now.charCodeAt(now.length - b))) b--;
+  const head = now.slice(0, a), tail = now.slice(now.length - b), inserted = now.slice(a, now.length - b);
+  let room = max - (byteLen(last) - byteLen(last.slice(a, last.length - b))), kept = "";
+  for (const ch of inserted) { const n = byteLen(ch); if (n > room) break; kept += ch; room -= n; }
+  input.value = head + kept + tail;
+  const caret = (head + kept).length;
+  input.setSelectionRange(caret, caret);
+}
+
+function refreshPreview(p) {              // the seed + the small QR of the text in the box
+  const text = p.input.value, bytes = byteLen(text), max = maxBytes();
+  p.count.textContent = `${bytes} / ${max}`;
+  p.count.classList.toggle("full", bytes >= max);
+  const c = p.qr.getContext("2d");
+  p.seed = null;
+  if (bytes && bytes <= max) {
+    p.seed = E.seedFor(text, boardClass);
+    const size = p.seed.n - E.PAD * 2, q = 4, n = size + q * 2;
+    p.qr.width = p.qr.height = n;
+    c.fillStyle = "#fff"; c.fillRect(0, 0, n, n); c.fillStyle = "#000";
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++)
+      if (p.seed.cells[(y + E.PAD) * p.seed.n + x + E.PAD]) c.fillRect(x + q, y + q, 1, 1);
+  } else {
+    p.qr.width = p.qr.height = 1;
+    c.fillStyle = "#fff"; c.fillRect(0, 0, 1, 1);
+  }
+}
+const ready = () => players.every(p => p.seed);
+const tooLong = () => players.some(p => byteLen(p.input.value) > maxBytes());
+
+function onTyping(p) {
+  enforceLimit(p);
+  p.lastValue = p.input.value;
+  if (state !== "idle") backToPreview();    // typing after a battle (or any edit) replaces the boards by new previews
+  refreshPreview(p);
+  syncControls();
+}
+function backToPreview() {
+  state = "idle"; running = false; gen = 0;
+  players.forEach(p => { p.game = null; p.rings = []; p.labels.replaceChildren(); p.root.classList.remove("win", "lose"); });
+  players.forEach(refreshPreview);
+  if ($("result").open) $("result").close();
+  hud();
+  syncControls();
+}
+
+players.forEach(p => {
+  p.input.addEventListener("input", e => { if (!e.isComposing) onTyping(p); else refreshPreview(p); });
+  p.input.addEventListener("compositionend", () => onTyping(p));
+  p.input.addEventListener("keydown", e => {
+    if (e.key !== "Enter" || e.isComposing || e.keyCode === 229) return;
+    e.preventDefault();
+    if (ready()) startBattle();
+    else { const other = players.find(q => !q.seed); (other || p).input.focus(); }
+  });
+});
+
+/* ---- battle ---- */
+function startBattle() {
+  if (!ready()) return;
+  state = "running"; running = true; gen = 0;
+  $("result").open && $("result").close();
+  players.forEach(p => {
+    p.game = E.createGame(p.input.value, boardClass);
+    p.rings = []; p.labels.replaceChildren(); p.root.classList.remove("win", "lose");
+    p.input.disabled = true;
+  });
+  hud();
+  syncControls();
+  players.forEach(p => { p.score.textContent = p.game.score; });
+}
+
+function tick() {
+  players.forEach(p => { const ev = p.game.step(); if (ev.length) onEvents(p, ev); });
+  gen = Math.max(...players.map(p => p.game.gen));
+  hud();
+  if (players.every(p => p.game.finished)) endBattle();
+}
+
+function onEvents(p, events) {
+  p.score.classList.remove("bump"); void p.score.offsetWidth; p.score.classList.add("bump");
+  for (const e of events) {
+    if (e.rank >= 3) { showLabel(p, e); p.rings.push({ cx: e.cx, cy: e.cy, size: e.size, rank: e.rank, t0: performance.now() }); }
+  }
+}
+
+function endBattle() {
+  state = "over"; running = false;
+  players.forEach(p => { p.input.disabled = false; });
+  const [a, b] = players.map(p => p.game.score);
+  players[0].root.classList.toggle("win", a > b); players[0].root.classList.toggle("lose", a < b);
+  players[1].root.classList.toggle("win", b > a); players[1].root.classList.toggle("lose", b < a);
+  showResult();
+  syncControls();
+}
+
+/* ---- the little effects on a board: a pattern's name and a ring ---- */
+function showLabel(p, e) {
+  const t = T(), W = p.board.clientWidth, s = W / p.game.n, half = e.size / 2 + 0.7;
+  const el = document.createElement("div");
+  el.className = "fx-label";
+  el.textContent = E.NAMES[lang][e.id];
+  el.style.borderColor = E.RANK_COLORS[e.rank];
+  p.labels.appendChild(el);
+  const w = el.offsetWidth, h = el.offsetHeight, gap = 5;
+  const topY = (e.cy + 0.5 - half) * s, botY = (e.cy + 0.5 + half) * s, cx = (e.cx + 0.5) * s;
+  const above = topY - gap - h >= 3;       // just outside the pattern: above it, or below when there is no room above
+  el.style.left = Math.min(W - w / 2 - 3, Math.max(w / 2 + 3, cx)) + "px";
+  el.style.top = (above ? topY - gap : botY + gap) + "px";
+  const base = above ? "translate(-50%,-100%)" : "translate(-50%,0)", away = above ? " translateY(-8px)" : " translateY(8px)";
+  el.animate(REDUCED_MOTION ? [
+    { opacity: 0, transform: base }, { opacity: 1, transform: base, offset: 0.15 }, { opacity: 1, transform: base, offset: 0.7 }, { opacity: 0, transform: base },
+  ] : [
+    { opacity: 0, transform: base + " scale(.9)" }, { opacity: 1, transform: base + " scale(1)", offset: 0.15 },
+    { opacity: 1, transform: base + " scale(1)", offset: 0.7 }, { opacity: 0, transform: base + away },
+  ], { duration: 1700, easing: "ease-out" }).onfinish = () => el.remove();
+}
+
+function draw(p) {
+  const cv = p.board, ctx = p.ctx, W = cv.width;
+  ctx.clearRect(0, 0, W, W);
+  const src = p.game ? { n: p.game.n, cells: p.game.cur } : p.seed;
+  if (!src) return;
+  const n = src.n, S = W / n, pad = S * 0.05, tint = p.game ? p.game.tint : null;
+  for (let i = 0; i < src.cells.length; i++) {
+    if (!src.cells[i]) continue;
+    const x = i % n, y = (i - x) / n;
+    ctx.fillStyle = p.game ? E.RANK_COLORS[tint[i]] : GHOST;
+    ctx.fillRect(x * S + pad, y * S + pad, S - 2 * pad, S - 2 * pad);
+  }
+  const now = performance.now();
+  p.rings = p.rings.filter(r => now - r.t0 < 900);
+  for (const r of p.rings) {                                   // a ring spreads from the pattern and fades
+    const k = (now - r.t0) / 900, ease = 1 - (1 - k) ** 3, rad = (r.size * 0.5 + ease * (3 + r.rank * 2)) * S;
+    ctx.globalAlpha = 0.9 * (1 - k); ctx.strokeStyle = E.RANK_COLORS[r.rank]; ctx.lineWidth = Math.max(2, S * 0.3);
+    ctx.beginPath(); ctx.arc((r.cx + 0.5) * S, (r.cy + 0.5) * S, rad, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function sizeBoards() {
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  players.forEach(p => {
+    const w = Math.round(p.board.clientWidth * dpr);
+    if (w && p.board.width !== w) { p.board.width = p.board.height = w; }
+  });
+}
+new ResizeObserver(sizeBoards).observe($("arena"));
+
+/* ---- scores, progress, meter ---- */
+function hud() {
+  const t = T();
+  players.forEach(p => {
+    const g = p.game, frac = g ? (g.finished ? 1 : Math.min(1, g.gen / E.GAME_GENS)) : 0;
+    p.score.textContent = g ? g.score : 0;
+    p.fill.style.width = (frac * 100) + "%";
+    p.progress.classList.toggle("final", frac >= 0.9);
+    p.progress.classList.toggle("done", frac >= 1);
+    p.note.textContent = g && g.finished ? (g.reason === "limit" ? t.endLimit(E.GAME_GENS) : t.endSettled(g.gen)) : "";
+  });
+  $("gen").textContent = gen;
+  const a = players[0].game ? players[0].game.score : 0, b = players[1].game ? players[1].game.score : 0, total = a + b;
+  const share = total ? a / total * 100 : 50;
+  $("m1").style.width = share + "%"; $("m2").style.width = (100 - share) + "%";
+  $("cap").innerHTML = !players[0].game ? "" : a === b ? t.even : `<b>${t.leads(a > b ? 1 : 2, Math.abs(a - b))}</b>`;
+}
+
+/* ---- the result dialog ---- */
+function showResult() {
+  const t = T(), [a, b] = players.map(p => p.game.score);
+  $("rIcon").innerHTML = ICON.trophy(40);
+  $("rTitle").textContent = a === b ? t.draw : t.wins(a > b ? 1 : 2);
+  $("rRows").innerHTML = players.map(p => {
+    const g = p.game, win = g.score > players[1 - (p.i - 1)].game.score;
+    return `<div class="rrow ${win ? "win" : ""}"><span class="badge b${p.i}">P${p.i}</span><span><div>${t.player(p.i)}</div>` +
+      `<div class="why">${g.reason === "limit" ? t.endLimit(E.GAME_GENS) : t.endSettled(g.gen)}</div></span>` +
+      `<span class="score">${ICON.trophy(18)}<b>${g.score}</b></span></div>`;
+  }).join("");
+  $("result").showModal();
+}
+$("rClose").onclick = () => $("result").close();
+$("rRematch").onclick = () => startBattle();
+$("rNew").onclick = () => { $("result").close(); players.forEach(p => { p.input.value = ""; p.lastValue = ""; }); backToPreview(); players[0].input.focus(); };
+$("result").addEventListener("click", e => { if (e.target === $("result")) $("result").close(); });
+
+/* ---- buttons, class, language ---- */
+function syncControls() {
+  const t = T(), size = E.boardSize(boardClass) - E.PAD * 2;
+  const inMatch = state === "running";
+  $("start").innerHTML = state === "idle" ? ICON.play(24) : ICON.restart(24);
+  $("start").title = state === "idle" ? t.start : t.restart;
+  $("start").setAttribute("aria-label", $("start").title);
+  $("start").disabled = !ready();
+  $("pause").innerHTML = running || !inMatch ? ICON.pause() : ICON.play();
+  $("pause").title = running || !inMatch ? t.pause : t.resume;
+  $("pause").setAttribute("aria-label", $("pause").title);
+  $("pause").disabled = !inMatch;
+  $("cls").innerHTML = ICON.grid(boardClass === "small" ? 3 : 5);
+  $("cls").title = `${boardClass === "small" ? t.classSmall : t.classLarge} · ${size}×${size} · ${t.upTo(maxBytes())}`;
+  $("cls").setAttribute("aria-label", $("cls").title);
+  const hint = $("hint");
+  hint.textContent = tooLong() ? t.tooLong(maxBytes()) : state === "idle" && !ready() ? t.hint : state === "idle" ? t.start : "";
+  hint.classList.toggle("err", tooLong());
+}
+function applyLang() {
+  const t = T();
+  document.documentElement.lang = lang;
+  document.title = t.title;
+  $("title").textContent = t.title;
+  players.forEach(p => { p.pname.textContent = t.player(p.i); p.input.placeholder = t.placeholder; p.root.querySelector(".ti").innerHTML = ICON.trophy(20); });
+  $("genicon").innerHTML = ICON.glider(16); $("genbox").title = t.gen; $("genMax").textContent = ` / ${E.GAME_GENS}`;
+  $("lang").innerHTML = ICON.globe(18) + `<span>${t.label}</span>`; $("lang").title = t.lang; $("lang").setAttribute("aria-label", t.lang);
+  $("rClose").textContent = t.close; $("rNew").textContent = t.newTexts; $("rRematch").textContent = t.rematch;
+  syncControls();
+  hud();
+  if ($("result").open) showResult();
+}
+$("lang").onclick = () => {
+  const codes = Object.keys(I18N);
+  lang = codes[(codes.indexOf(lang) + 1) % codes.length];
+  try { localStorage.setItem("qrlife-lang", lang); } catch (e) { /* ignore */ }
+  applyLang();
+};
+$("cls").onclick = () => {
+  const names = Object.keys(E.BOARD_CLASSES);
+  boardClass = names[(names.indexOf(boardClass) + 1) % names.length];
+  try { localStorage.setItem("qrlife-class", boardClass); } catch (e) { /* ignore */ }
+  players.forEach(p => { enforceLimit(p); p.lastValue = p.input.value; });
+  backToPreview();
+  syncControls();
+};
+$("pause").onclick = () => { running = !running; syncControls(); };
+$("start").onclick = startBattle;
+
+/* ===================== main loop ===================== */
+let last = 0;
+function frame(t) {
+  requestAnimationFrame(frame);
+  if (state === "running" && running && t - last >= 1000 / FPS) { last = t; tick(); }
+  players.forEach(draw);
+}
+sizeBoards();
+backToPreview();
+applyLang();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
