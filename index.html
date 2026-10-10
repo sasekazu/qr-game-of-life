@@ -376,7 +376,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 life.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(20, 1, 0.1, 4000);   // narrow fov: nearly flat, 2D-like
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 4000);   // no perspective: a true 2D plan view
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.enablePan = false;
@@ -424,8 +424,8 @@ let tint = new Uint8Array(0);                        // 0 = plain, 1..5 = part o
 
 // ---- droplet view: living cells are metaballs, drawn by a fragment shader ----
 // Every live cell adds a smooth bump to a field; where the field passes a threshold there is "water".
-// Neighbouring cells overlap and fuse into one drop, isolated cells stay round, and the field's slope gives
-// each drop a glossy highlight. The board wraps, so drops also fuse across the edges of the world.
+// Neighbouring cells overlap and fuse into one drop, isolated cells stay round. Drops are flat-coloured (2D look).
+// The board wraps, so drops also fuse across the edges of the world.
 let dropletOn = true;
 try { dropletOn = localStorage.getItem("qrlife-view") !== "cells"; } catch (e) { /* storage unavailable */ }
 const dropMat = new THREE.ShaderMaterial({
@@ -449,7 +449,6 @@ const dropMat = new THREE.ShaderMaterial({
       vec2 p = vec2(vUv.x, 1.0 - vUv.y) * uN;           // board coordinates, y down
       ivec2 c0 = ivec2(floor(p));
       float f = 0.0, wsum = 0.0;
-      vec2 g = vec2(0.0);
       vec3 col = vec3(0.0);
       for (int oy = -2; oy <= 2; oy++) {
         for (int ox = -2; ox <= 2; ox++) {
@@ -462,7 +461,6 @@ const dropMat = new THREE.ShaderMaterial({
           float k = 1.0 - q;
           float w = d.a * k * k * k;                     // smooth bump (1 - q)^3
           f += w;
-          g += d.a * 3.0 * k * k * (-2.0 * r / (R * R)); // its gradient, for the surface normal
           col += d.rgb * w;
           wsum += w;
         }
@@ -471,11 +469,7 @@ const dropMat = new THREE.ShaderMaterial({
       float a = smoothstep(T - e, T + e, f);             // anti-aliased edge of the drop
       if (a <= 0.0) discard;
       vec3 base = col / max(wsum, 1e-4);                 // colours of fused cells blend
-      vec3 nrm = normalize(vec3(-g * 0.45, 1.0));        // tilts outward toward the rim
-      vec3 L = normalize(vec3(-0.5, -0.6, 0.8));         // light from the upper left
-      float diff = clamp(dot(nrm, L), 0.0, 1.0);
-      float spec = pow(max(dot(nrm, normalize(L + vec3(0.0, 0.0, 1.0))), 0.0), 60.0);
-      gl_FragColor = vec4(base * (0.7 + 0.5 * diff) + vec3(0.55) * spec, a);
+      gl_FragColor = vec4(base, a);
       #include <colorspace_fragment>
     }`,
 });
@@ -490,12 +484,22 @@ function applyView() {
   dropMesh.visible = dropletOn;
 }
 
+let viewAspect = 1;
+// the visible area is the whole board plus a small margin, whatever the shape of the box
+function fitCamera() {
+  if (!N) return;
+  const half = N * 0.56 * Math.max(1, 1 / viewAspect);
+  camera.top = half; camera.bottom = -half;
+  camera.left = -half * viewAspect; camera.right = half * viewAspect;
+  camera.updateProjectionMatrix();
+}
+
 function resize() {
   const w = life.clientWidth, h = life.clientHeight;
   if (!w || !h) return;
   renderer.setSize(w, h);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
+  viewAspect = w / h;
+  fitCamera();
 }
 new ResizeObserver(resize).observe(life);
 resize();
@@ -519,14 +523,17 @@ function buildGrid(n) {
   applyView();
   layoutWorldEdge(n);
   floor.scale.set(n * 10, n * 10, 1);                  // same colour as the page: reads as an endless floor
-  controls.minDistance = n * 1;
-  controls.maxDistance = n * 5;
+  controls.minZoom = 0.6;                              // wheel zoom range (1 = the whole board)
+  controls.maxZoom = 5;
   resetView();
 }
 
 // straight down, whole field in view
 function resetView() {
-  camera.position.set(0, N * 3.15, 0.001);   // a little margin around the frame
+  fitCamera();
+  camera.zoom = 1;
+  camera.updateProjectionMatrix();
+  camera.position.set(0, N * 3.15, 0.001);   // straight down; the distance does not change the size
   controls.target.set(0, 0, 0);
   controls.update();
 }
