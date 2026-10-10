@@ -576,7 +576,7 @@ function load(cells, n, asGhost = false) {
   animateCells(0, true);
   gen = 0; clearFx(); logEl.replaceChildren(); entries = []; draw();
   resetScore();
-  if (!asGhost) { detect(true); seenStates.set(stateKey(), 0); }   // a preview is not a game: no pattern log, no effects
+  if (!asGhost) detect(true);                          // a preview is not a game: no pattern log, no effects
 }
 
 /* ===================== Sound ===================== */
@@ -868,32 +868,19 @@ function step() {
   [cur, nxt] = [nxt, cur];
   gen++;
   detect();
-  if (gen >= GAME_GENS) finish("limit");
-  else {
-    const k = stateKey();
-    if (seenStates.has(k)) finish("settled");            // back to an earlier state: stuck in a cycle for good
-    else seenStates.set(k, gen);
-  }
+  if (gen >= GAME_GENS) finish();
 }
 
 /* ---- scoring ---- */
 // Every new appearance of a pattern scores points by its rank: 1, 3, 9, 27, 81. The ranks are a ladder in which each
 // step is about 3x rarer (see PATTERNS), so each rank is worth about the same in total and hunting for rare patterns
-// pays. A game ends after GAME_GENS generations, or earlier once the board repeats a state it has already been in
-// (it is then stuck in a cycle and nothing new can ever appear). The game is deterministic: the same text on the same
-// class always gives the same score, so the way to score higher is to find a better text.
+// pays. A game lasts exactly GAME_GENS generations. The game is deterministic: the same text on the same class always
+// gives the same score, so the way to score higher is to find a better text.
 const POINTS = [0, 1, 3, 9, 27, 81];
 const GAME_GENS = 1000;
 let score = 0, finished = false, resultInfo = null;
-const seenStates = new Map();
-function stateKey() {
-  let h = 2166136261, pop = 0;
-  for (let i = 0; i < cur.length; i++) { h = Math.imul(h ^ cur[i], 16777619); pop += cur[i]; }
-  return (h >>> 0).toString(36) + ":" + pop;
-}
 function resetScore() {
   score = 0; finished = false; resultInfo = null;
-  seenStates.clear();
   $("score").textContent = 0;
   renderResult();
 }
@@ -903,14 +890,14 @@ function addScore(points) {
   el.textContent = score;
   el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump");   // restart the little pop animation
 }
-function finish(reason) {
+function finish() {
   finished = true; running = false; holding = false;
   const key = "qrlife-best-" + boardClass;
   let prev = 0;
   try { prev = +localStorage.getItem(key) || 0; } catch (e) { /* storage unavailable */ }
   const isBest = score > prev;
   if (isBest) { try { localStorage.setItem(key, score); } catch (e) { /* ignore */ } }
-  resultInfo = { score, best: Math.max(prev, score), isBest, reason, gen };
+  resultInfo = { score, best: Math.max(prev, score), isBest };
   renderResult();
   syncButtons();
   playRank(isBest ? 5 : 3);
@@ -923,7 +910,7 @@ function renderResult() {
   const line = $("resLine");
   line.textContent = resultInfo.isBest ? t.newBest : t.best(resultInfo.best);
   line.classList.toggle("new", resultInfo.isBest);
-  $("resWhy").textContent = resultInfo.reason === "limit" ? t.endLimit(GAME_GENS) : t.endSettled(resultInfo.gen);
+  $("resWhy").textContent = t.endLimit(GAME_GENS);
 }
 
 /* ---- famous patterns ---- */
@@ -1083,7 +1070,7 @@ const I18N = {
     logLabel: "Detected patterns", logEmpty: "Patterns you find will appear here",
     guide: "Pattern guide", close: "Close",
     score: "Score", best: n => `Best ${n}`, newBest: "New best!", replay: "Replay",
-    endLimit: n => `${n} generations played`, endSettled: g => `Settled at generation ${g}: nothing new can appear`,
+    endLimit: n => `${n} generations played`,
     classSmall: "Small board", classLarge: "Large board", upTo: n => `up to ${n} bytes`,
     rarity: r => `Rarity ${r} / 5`,
     names: { block: "Block", beehive: "Beehive", loaf: "Loaf", boat: "Boat", ship: "Ship", tub: "Tub", pond: "Pond",
@@ -1103,7 +1090,7 @@ const I18N = {
     logLabel: "検出したパターン", logEmpty: "見つけたパターンがここに表示されます",
     guide: "パターン一覧", close: "閉じる",
     score: "得点", best: n => `ベスト ${n}`, newBest: "ベスト更新！", replay: "もう一度見る",
-    endLimit: n => `${n}世代まで到達`, endSettled: g => `${g}世代で盤面が落ち着きました（もう新しいパターンは出ません）`,
+    endLimit: n => `${n}世代まで到達`,
     classSmall: "小さい盤面", classLarge: "大きい盤面", upTo: n => `最大 ${n} バイト`,
     rarity: r => `レア度 ${r} / 5`,
     names: { block: "ブロック", beehive: "ビーハイブ", loaf: "ローフ", boat: "ボート", ship: "シップ", tub: "タブ", pond: "ポンド",
