@@ -1459,7 +1459,7 @@ function renderRank() {                                       // names go in wit
     const li = document.createElement("li");
     li.className = row.mine ? "mine" : "";
     for (const [cls, value] of [["no", i + 1], ["nm", row.name], ["pt", row.score],
-        ["dt", row.createdAt ? row.createdAt.toLocaleDateString(lang) : ""]]) {
+        ["dt", row.at ? row.at.toLocaleDateString(lang) : ""]]) {
       const s = document.createElement("span");
       s.className = cls; s.textContent = value;
       li.append(s);

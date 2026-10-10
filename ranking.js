@@ -1,7 +1,7 @@
 // Online ranking on Cloud Firestore. Loaded lazily by index.html, so a failure here (CDN blocked, offline, quota used up)
 // can never stop the game: every function rejects with a plain Error and the caller shows a message.
 //
-// Data: rankings/{small|large}/scores/{uid} = { name, score, createdAt }. The document id is the player's anonymous uid,
+// Data: rankings/{small|large}/scores/{uid} = { name, score, createdAt (first registration), updatedAt (when this best was set) }. The document id is the player's anonymous uid,
 // so each player has exactly one entry per board class (their best), and firestore.rules lets only that uid write it.
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
@@ -55,13 +55,15 @@ export async function submitScore(cls, rawName, score) {
   const prev = await withTimeout(getDoc(ref), "read");
   const prevScore = prev.exists() ? prev.data().score : -1;
   if (score <= prevScore) return { saved: false, best: prevScore };
-  await withTimeout(setDoc(ref, { name, score, createdAt: serverTimestamp() }), "write");
+  // a first entry gets createdAt = now; an improvement keeps the original createdAt (the rules insist on it)
+  const createdAt = prev.exists() ? prev.data().createdAt : serverTimestamp();
+  await withTimeout(setDoc(ref, { name, score, createdAt, updatedAt: serverTimestamp() }), "write");
   cache.delete(cls);
   return { saved: true, best: score };
 }
 
 const cache = new Map();                    // cls -> { at, data }
-// Top TOP_N of a class: { rows: [{ name, score, createdAt: Date|null, mine }] }. Works without a successful sign-in
+// Top TOP_N of a class: { rows: [{ name, score, at: Date|null, mine }] }. Works without a successful sign-in
 // (reading is public); `mine` then simply stays false.
 export async function fetchTop(cls, { force = false } = {}) {
   checkClass(cls);
@@ -75,7 +77,7 @@ export async function fetchTop(cls, { force = false } = {}) {
     return {
       name: typeof v.name === "string" ? v.name : "?",
       score: Number.isFinite(v.score) ? v.score : 0,
-      createdAt: v.createdAt?.toDate?.() ?? null,
+      at: (v.updatedAt ?? v.createdAt)?.toDate?.() ?? null,         // the day this best was set
       mine: !!user && d.id === user.uid,
     };
   });
