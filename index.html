@@ -1167,7 +1167,7 @@ function detect(silent = false) {
 }
 
 /* ===================== Language + pictograms ===================== */
-// English is the default; add another language by adding an entry here (the globe button cycles through them).
+// English is the default (Japanese for visitors whose browser or time zone says Japan); add another language by adding an entry here (the globe button cycles through them).
 const I18N = {
   en: {
     label: "EN",
@@ -1224,7 +1224,16 @@ const I18N = {
              figure8: "フィギュアエイト", mwss: "中量宇宙船", hwss: "重量宇宙船", rpent: "R-ペントミノ" },
   },
 };
-let lang = "en";
+// First visit: guess Japan from the browser's language list, then from the time zone (no geolocation prompt, nothing is
+// sent anywhere). A language the user picked with the globe button (saved below) always wins.
+function guessLang() {
+  try {
+    if ((navigator.languages || [navigator.language]).some(l => /^ja/i.test(l || ""))) return "ja";
+    if (Intl.DateTimeFormat().resolvedOptions().timeZone === "Asia/Tokyo") return "ja";
+  } catch (e) { /* unknown: fall back to English */ }
+  return "en";
+}
+let lang = guessLang();
 try { const l = localStorage.getItem("qrlife-lang"); if (I18N[l]) lang = l; } catch (e) { /* storage unavailable */ }
 const T = () => I18N[lang];
 const patName = id => T().names[id];

@@ -189,7 +189,16 @@ const I18N = {
     endLimit: g => `${g}世代`, endSettled: g => `${g}世代で繰り返し`, rarity: r => `レア度 ${r} / 5`,
   },
 };
-let lang = "en";
+// First visit: guess Japan from the browser's language list, then from the time zone (no geolocation prompt, nothing is
+// sent anywhere). A language the user picked with the globe button (saved below) always wins.
+function guessLang() {
+  try {
+    if ((navigator.languages || [navigator.language]).some(l => /^ja/i.test(l || ""))) return "ja";
+    if (Intl.DateTimeFormat().resolvedOptions().timeZone === "Asia/Tokyo") return "ja";
+  } catch (e) { /* unknown: fall back to English */ }
+  return "en";
+}
+let lang = guessLang();
 try { const l = localStorage.getItem("qrlife-lang"); if (I18N[l]) lang = l; } catch (e) { /* storage unavailable */ }
 const T = () => I18N[lang];
 
