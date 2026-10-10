@@ -692,8 +692,8 @@ function playRank(rank) {
 }
 
 /* ===================== Effects ===================== */
-// New pattern -> rank 3+: the game freezes for a moment, then carries on. rank 3: ripple; rank 4: double ripple + screen shake;
-// rank 5: triple ripple, particles, flash, shake, name label, and a glow while it lives.
+// New pattern -> rank 3+: the game freezes for a moment (then carries on) and the pattern's name is shown. rank 3: ripple;
+// rank 4: double ripple + screen shake; rank 5: triple ripple, particles, flash, shake and a glow while it lives.
 const REDUCED_MOTION = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const toWorld = (cx, cy) => [cx - (N / 2 - 0.5), cy - (N / 2 - 0.5)];
 
@@ -823,7 +823,11 @@ function showLabel(name, x, z, rank) {
   el.style.top = Math.min(88, Math.max(12, (-v.y * 0.5 + 0.5) * 100)) + "%";
   el.style.borderColor = RANK_COLORS[rank];
   life.appendChild(el);
-  el.animate([
+  const still = "translate(-50%,-110%)";
+  el.animate(REDUCED_MOTION ? [                                         // no movement for "reduce motion": it only fades
+    { opacity: 0, transform: still }, { opacity: 1, transform: still, offset: 0.15 },
+    { opacity: 1, transform: still, offset: 0.75 }, { opacity: 0, transform: still },
+  ] : [
     { opacity: 0, transform: "translate(-50%,-30%) scale(.8)" },
     { opacity: 1, transform: "translate(-50%,-90%) scale(1)", offset: 0.15 },
     { opacity: 1, transform: "translate(-50%,-110%) scale(1)", offset: 0.75 },
@@ -858,12 +862,13 @@ function celebrate(p) {
   const [x, z] = toWorld(p.cx, p.cy), r = p.rank;
   playRank(r);
   if (r >= 3) holdGame(1000);
+  if (r >= 3) showLabel(patName(p.name), x, z, r);                    // whatever freezes the game also gets its name shown
   if (r >= 3) addRipple(x, z, r, p.size);
   if (r >= 4) addRipple(x, z, r, p.size, 0.15);
   if (r >= 5) addRipple(x, z, r, p.size, 0.3);
   if (r >= 5) addBurst(x, z, r, p.size);
   if (r >= 4 && !REDUCED_MOTION) shake();
-  if (r >= 5 && !REDUCED_MOTION) { flash(r); showLabel(patName(p.name), x, z, r); }
+  if (r >= 5 && !REDUCED_MOTION) flash(r);
 }
 
 function tickFx(dt) {
