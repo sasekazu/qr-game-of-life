@@ -10,6 +10,7 @@ const src = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const cut = (a, b) => { const i = src.indexOf(a), j = src.indexOf(b, i); if (i < 0 || j < 0) throw new Error("cut " + a); return src.slice(i, j); };
 const code = [cut("const QR = (() => {", "/* ===================== Game of Life"), cut("function lifeStep", "function step()"),
   cut("/* ---- famous patterns ---- */", "// Follow patterns")].join("\n");
+const QR_VERSION = +src.match(/const QR_VERSION = (\d+);/)[1];   // the page's fixed QR version
 const speedLine = src.match(/const SPEED = (\{.*?\});/)[1];
 const ctx = { TextEncoder };
 vm.createContext(ctx);
@@ -32,7 +33,7 @@ for (let i = 0; i < +(process.argv[2] || 300); i++) {                           
 
 const soups = {}, appear = {};
 function run(text) {
-  const qr = ctx.QR.encode(new TextEncoder().encode(text), 1), n = qr.size + PAD * 2;
+  const qr = ctx.QR.encode(new TextEncoder().encode(text), 1, QR_VERSION), n = qr.size + PAD * 2;
   let cur = new Uint8Array(n * n), nxt = new Uint8Array(n * n);
   for (let y = 0; y < qr.size; y++) for (let x = 0; x < qr.size; x++) cur[(y + PAD) * n + x + PAD] = qr.modules[y * qr.size + x];
   const tint = new Uint8Array(n * n), seen = new Set();

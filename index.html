@@ -213,11 +213,14 @@ const QR = (() => {
     return res;
   }
 
-  function encode(bytes, ecl) {
-    // choose the smallest version that fits
-    let ver = 1;
-    while (ver <= 40 && bytes.length > maxBytes(ver, ecl)) ver++;
-    if (ver > 40) throw new RangeError("too long");
+  // `fixedVer` (optional) forces that QR version, so every input gives a grid of the same size
+  function encode(bytes, ecl, fixedVer = 0) {
+    let ver = fixedVer || 1;
+    if (fixedVer) { if (bytes.length > maxBytes(ver, ecl)) throw new RangeError("too long"); }
+    else {                                                          // otherwise the smallest version that fits
+      while (ver <= 40 && bytes.length > maxBytes(ver, ecl)) ver++;
+      if (ver > 40) throw new RangeError("too long");
+    }
 
     // bit stream: mode(0100) + count + data + terminator + pad
     const bits = [];
@@ -385,6 +388,9 @@ const QR = (() => {
 /* ===================== Game of Life ===================== */
 const $ = id => document.getElementById(id);
 const PAD = 12, FPS = 12;
+// Every input is encoded at the same QR version (41 x 41 modules, up to 106 bytes), so every game starts on a board
+// of the same size with a similar number of live cells: the games are comparable.
+const QR_VERSION = 6;
 const CELL_H = 0.5;      // height of a living cell (cube column)
 // cell colour: plain cells, then rank 1..5 (cool -> hot)
 const RANK_COLORS = ["#111111", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#a855f7"];
@@ -826,29 +832,30 @@ function step() {
 }
 
 /* ---- famous patterns ---- */
-// [id, rank, period, first phase]. The rank is the rarity: the share of ~1100 QR "soups" (every printable ASCII
-// character plus random strings, run for 1000 generations) in which the pattern ever appeared:
-//   1: 95%+   2: 60-95%   3: 15-60%   4: 3-15%   5: under 3%   (measure again with the tally script after changes)
+// [id, rank, period, first phase]. The rank is the rarity: the share of ~1100 QR "soups" on the fixed 41 x 41 board
+// (every printable ASCII character plus random strings, run for 1000 generations) in which the pattern ever appeared:
+//   1: 95%+   2: 60-95%   3: 15-60%   4: 3-15%   5: under 3%
+// Measure again (node tools/tally.cjs 1000) after changing the board size or the pattern list.
 const PATTERNS = [
   ["block", 1, 1, "OO/OO"],
   ["beehive", 1, 1, ".OO./O..O/.OO."],
-  ["loaf", 2, 1, ".OO./O..O/.O.O/..O."],
-  ["boat", 2, 1, "OO./O.O/.O."],
-  ["ship", 3, 1, "OO./O.O/.OO"],
+  ["loaf", 1, 1, ".OO./O..O/.O.O/..O."],
+  ["boat", 1, 1, "OO./O.O/.O."],
+  ["ship", 2, 1, "OO./O.O/.OO"],
   ["tub", 2, 1, ".O./O.O/.O."],
   ["pond", 2, 1, ".OO./O..O/O..O/.OO."],
   ["blinker", 1, 2, "OOO"],
   ["toad", 3, 2, ".OOO/OOO."],
-  ["beacon", 4, 2, "OO../OO../..OO/..OO"],
+  ["beacon", 3, 2, "OO../OO../..OO/..OO"],
   ["pulsar", 5, 3, "..OOO...OOO../............./O....O.O....O/O....O.O....O/O....O.O....O/..OOO...OOO../............./..OOO...OOO../O....O.O....O/O....O.O....O/O....O.O....O/............./..OOO...OOO.."],
-  ["glider", 2, 4, ".O./..O/OOO"],
+  ["glider", 1, 4, ".O./..O/OOO"],
   ["lwss", 5, 4, "O..O./....O/O...O/.OOOO"],
   ["snake", 5, 1, "OO.O/O.OO"],
-  ["carrier", 5, 1, "OO../O..O/..OO"],
+  ["carrier", 4, 1, "OO../O..O/..OO"],
   ["barge", 4, 1, ".O../O.O./.O.O/..O."],
   ["longboat", 3, 1, "OO../O.O./.O.O/..O."],
   ["mango", 4, 1, ".OO../O..O./.O..O/..OO."],
-  ["eater", 5, 1, "OO../O.O./..O./..OO"],
+  ["eater", 4, 1, "OO../O.O./..O./..OO"],
   ["clock", 5, 2, "..O./O.O./.O.O/.O.."],
   ["figure8", 5, 8, "OOO.../OOO.../OOO.../...OOO/...OOO/...OOO"],
   ["mwss", 5, 4, "..O.../O...O./.....O/O....O/.OOOOO"],
@@ -1143,8 +1150,8 @@ function preview() {
     return;
   }
   let qr;
-  try { qr = QR.encode(bytes, 1); }
-  catch (e) { hintState.tooLong = QR.maxBytes(40, 1); renderHint(); return; }
+  try { qr = QR.encode(bytes, 1, QR_VERSION); }
+  catch (e) { hintState.tooLong = QR.maxBytes(QR_VERSION, 1); renderHint(); return; }
   pending = qr;
   const q = 4, n = qr.size + q * 2;     // with quiet zone
   qrCanvas.width = qrCanvas.height = n;

@@ -19,6 +19,7 @@ const chars = process.argv[2];
 if (!chars) { console.error('usage: node tools/scan.cjs "<characters>"'); process.exit(1); }
 
 const src = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+const QR_VERSION = +src.match(/const QR_VERSION = (\d+);/)[1];   // the page's fixed QR version
 const cut = (a, b) => {
   const i = src.indexOf(a), j = src.indexOf(b, i);
   if (i < 0 || j < 0) throw new Error("index.html layout changed, cannot find: " + a);
@@ -38,7 +39,7 @@ vm.runInContext(
   "\nthis.setState = (n, c, t) => { N = n; cur = c; tint = t; };", ctx);
 
 function scan(ch) {
-  const qr = ctx.QR.encode(new TextEncoder().encode(ch), ECL);
+  const qr = ctx.QR.encode(new TextEncoder().encode(ch), ECL, QR_VERSION);
   const n = qr.size + PAD * 2;
   let cur = new Uint8Array(n * n), nxt = new Uint8Array(n * n);
   for (let y = 0; y < qr.size; y++)
