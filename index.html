@@ -420,6 +420,8 @@ const cellMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5
 const TINT = RANK_COLORS.map(h => new THREE.Color(h));
 let mesh = null, cellScale = new Float32Array(0);   // cellScale: 0..1 animated size of each cell
 let tint = new Uint8Array(0);                        // 0 = plain, 1..5 = part of a detected pattern of that rank
+let ghost = false;                                   // true while the board only previews the QR (pale cells, nothing runs)
+const GHOST = new THREE.Color(0xc6c6c6);
 
 let viewAspect = 1;
 // the visible area is the whole board plus a small margin, whatever the shape of the box
@@ -491,7 +493,7 @@ function animateCells(dt, force = false) {
       dirty = true;
     }
     // colour: invisible (nearly dead) cells snap to their target, visible ones fade
-    const tc = TINT[tint[i]], j3 = i * 3;
+    const tc = ghost ? GHOST : TINT[tint[i]], j3 = i * 3;
     const dr = tc.r - c[j3], dg = tc.g - c[j3 + 1], db = tc.b - c[j3 + 2];
     if (dr || dg || db) {
       const f = s < 0.05 || force ? 1 : kc;
@@ -504,14 +506,16 @@ function animateCells(dt, force = false) {
   if (cDirty) mesh.instanceColor.needsUpdate = true;
 }
 
-function load(cells, n) {
+function load(cells, n, asGhost = false) {
   const resized = n !== N || !mesh;
+  ghost = asGhost;
   N = n; seed = cells; cur = Uint8Array.from(cells); nxt = new Uint8Array(n * n);
   if (resized) buildGrid(n);
   cellScale = Float32Array.from(cur);                  // snap to the new state, no animation
   tint = new Uint8Array(n * n);
   animateCells(0, true);
-  gen = 0; clearFx(); logEl.replaceChildren(); entries = []; draw(); detect(true);
+  gen = 0; clearFx(); logEl.replaceChildren(); entries = []; draw();
+  if (!asGhost) detect(true);                          // a preview is not a game: no pattern log, no effects
 }
 
 /* ===================== Sound ===================== */
@@ -1052,7 +1056,16 @@ function applyLang() {
 }
 
 /* ---- input -> QR preview -> start ---- */
-// typing only refreshes the small QR; the game on the board is left alone until "start"
+// the QR centred in an empty field: the Life seed
+function seedFromQR(qr) {
+  const g = qr.size + PAD * 2, cells = new Uint8Array(g * g);
+  for (let y = 0; y < qr.size; y++) for (let x = 0; x < qr.size; x++)
+    cells[(y + PAD) * g + x + PAD] = qr.modules[y * qr.size + x];
+  return { cells, g };
+}
+
+// Typing updates the small QR and, live, shows the starting position on the board in pale cells.
+// Nothing runs until "start"; typing during a game replaces it with the new preview.
 function preview() {
   const bytes = enc.encode(text.value), c = qrCanvas.getContext("2d");
   pending = null;
@@ -1061,6 +1074,7 @@ function preview() {
     qrCanvas.width = qrCanvas.height = 1;
     c.fillStyle = "#fff"; c.fillRect(0, 0, 1, 1);
     renderHint();
+    showPreview(null);
     return;
   }
   let qr;
@@ -1073,15 +1087,22 @@ function preview() {
   for (let y = 0; y < qr.size; y++) for (let x = 0; x < qr.size; x++)
     if (qr.modules[y * qr.size + x]) c.fillRect(x + q, y + q, 1, 1);
   renderHint();
+  showPreview(qr);
 }
 
-// life seed: the QR centred in an empty field; always (re)starts from the text in the box
+function showPreview(qr) {
+  const seedField = qr ? seedFromQR(qr) : { cells: new Uint8Array(45 * 45), g: 45 };
+  load(seedField.cells, seedField.g, true);
+  hasQR = false; running = false; holding = false;
+  note.hidden = !!qr;
+  syncButtons();
+}
+
+// always (re)starts from the text in the box
 function start() {
   audioWake();
   if (!pending) { text.focus(); return; }
-  const qr = pending, g = qr.size + PAD * 2, cells = new Uint8Array(g * g);
-  for (let y = 0; y < qr.size; y++) for (let x = 0; x < qr.size; x++)
-    cells[(y + PAD) * g + x + PAD] = qr.modules[y * qr.size + x];
+  const { cells, g } = seedFromQR(pending);
   load(cells, g);
   hasQR = true; holding = false; running = true;
   note.hidden = true;
