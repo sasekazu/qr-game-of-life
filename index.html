@@ -636,16 +636,16 @@ function whoosh(c, out, t0, dur, gain) {                            // rising no
 function voice(c, out, rank, t0) {
   switch (rank) {
     case 1:                                                         // a soft tick
-      tone(c, out, t0, NOTE(76), 0.07, "sine", 0.05);
+      tone(c, out, t0, NOTE(76), 0.08, "sine", 0.11);
       break;
     case 2:                                                         // two quick soft notes
-      tone(c, out, t0, NOTE(79), 0.1, "sine", 0.07);
-      tone(c, out, t0 + 0.06, NOTE(84), 0.12, "sine", 0.06);
+      tone(c, out, t0, NOTE(79), 0.1, "sine", 0.12);
+      tone(c, out, t0 + 0.06, NOTE(84), 0.12, "sine", 0.1);
       break;
     case 3:                                                         // chime
-      tone(c, out, t0, NOTE(76), 0.4, "triangle", 0.13);
-      tone(c, out, t0 + 0.09, NOTE(83), 0.45, "triangle", 0.12);
-      tone(c, out, t0 + 0.09, NOTE(95), 0.3, "sine", 0.04);
+      tone(c, out, t0, NOTE(76), 0.4, "triangle", 0.16);
+      tone(c, out, t0 + 0.09, NOTE(83), 0.45, "triangle", 0.15);
+      tone(c, out, t0 + 0.09, NOTE(95), 0.3, "sine", 0.05);
       break;
     case 4:                                                         // rising arpeggio
       [72, 76, 79, 84].forEach((m, i) => {
@@ -680,11 +680,20 @@ function audioWake() {
     master.gain.value = 0.7;
     master.connect(comp).connect(audio.destination);
   }
-  if (audio.state === "suspended") audio.resume();
+  if (audio.state !== "running") audio.resume().catch(() => { /* needs a user gesture: the next one retries */ });
 }
+// any click / key / touch counts as the gesture that lets audio start (the first one creates the context), and a tab that
+// comes back to the front gets its context woken again: browsers suspend it in the background
+["pointerdown", "keydown", "touchend"].forEach(ev => addEventListener(ev, audioWake, { passive: true }));
+document.addEventListener("visibilitychange", () => { if (!document.hidden && audio) audioWake(); });
 
 function playRank(rank) {
-  if (!soundOn || !audio || audio.state !== "running") return;
+  if (!soundOn || !audio) return;
+  if (audio.state !== "running") {                                   // suspended / interrupted: wake it, and keep the big sounds
+    audioWake();
+    if (rank >= 3) audio.resume().then(() => { if (audio.state === "running") playRank(rank); }).catch(() => {});
+    return;
+  }
   const now = performance.now(), gap = rank <= 2 ? 120 : 0;         // frequent small finds must not machine-gun
   if (now - (lastPlayed[rank] || -1e9) < gap) return;
   lastPlayed[rank] = now;
