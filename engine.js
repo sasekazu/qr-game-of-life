@@ -379,6 +379,70 @@ function seedFor(text, cls) {
   return { n, cells };
 }
 
+/* ---- sound effects: a tiny synth, no audio files. voice(context, destination node, rank 1-5, start time) ---- */
+const NOTE = m => 440 * 2 ** ((m - 69) / 12);                      // MIDI note number -> Hz
+
+function tone(c, out, t0, f, dur, type, gain, slideTo = 0) {
+  const o = c.createOscillator(), v = c.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f, t0);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+  v.gain.setValueAtTime(0.0001, t0);
+  v.gain.exponentialRampToValueAtTime(gain, t0 + 0.008);
+  v.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(v).connect(out);
+  o.start(t0); o.stop(t0 + dur + 0.02);
+}
+
+function whoosh(c, out, t0, dur, gain) {                            // rising noise sweep
+  const buf = c.createBuffer(1, Math.ceil(c.sampleRate * dur), c.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = c.createBufferSource(), bp = c.createBiquadFilter(), v = c.createGain();
+  src.buffer = buf;
+  bp.type = "bandpass"; bp.Q.value = 1.2;
+  bp.frequency.setValueAtTime(300, t0);
+  bp.frequency.exponentialRampToValueAtTime(5000, t0 + dur);
+  v.gain.setValueAtTime(0.0001, t0);
+  v.gain.exponentialRampToValueAtTime(gain, t0 + dur * 0.7);
+  v.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(bp).connect(v).connect(out);
+  src.start(t0);
+}
+
+function voice(c, out, rank, t0) {
+  switch (rank) {
+    case 1:                                                         // a soft tick
+      tone(c, out, t0, NOTE(76), 0.08, "sine", 0.11);
+      break;
+    case 2:                                                         // two quick soft notes
+      tone(c, out, t0, NOTE(79), 0.1, "sine", 0.12);
+      tone(c, out, t0 + 0.06, NOTE(84), 0.12, "sine", 0.1);
+      break;
+    case 3:                                                         // chime
+      tone(c, out, t0, NOTE(76), 0.4, "triangle", 0.16);
+      tone(c, out, t0 + 0.09, NOTE(83), 0.45, "triangle", 0.15);
+      tone(c, out, t0 + 0.09, NOTE(95), 0.3, "sine", 0.05);
+      break;
+    case 4:                                                         // rising arpeggio
+      [72, 76, 79, 84].forEach((m, i) => {
+        tone(c, out, t0 + i * 0.075, NOTE(m), 0.4, "triangle", 0.14);
+        tone(c, out, t0 + i * 0.075, NOTE(m + 12), 0.25, "sine", 0.04);
+      });
+      break;
+    default:                                                        // fanfare: boom, whoosh, run, chord
+      tone(c, out, t0, 110, 0.7, "sine", 0.4, 38);
+      whoosh(c, out, t0, 0.6, 0.18);
+      [60, 64, 67, 72, 76, 79, 84].forEach((m, i) => {
+        tone(c, out, t0 + 0.05 + i * 0.06, NOTE(m), 0.5, "sawtooth", 0.06);
+        tone(c, out, t0 + 0.05 + i * 0.06, NOTE(m), 0.5, "triangle", 0.1);
+      });
+      [72, 76, 79, 84].forEach(m => {
+        tone(c, out, t0 + 0.5, NOTE(m), 1.3, "sawtooth", 0.05);
+        tone(c, out, t0 + 0.5, NOTE(m), 1.3, "triangle", 0.09);
+      });
+  }
+}
+
 class Game {
   constructor(text, cls) {
     const { n, cells } = seedFor(text, cls);
@@ -440,7 +504,7 @@ class Game {
 }
 
 return {
-  QR, BOARD_CLASSES, PAD, POINTS, GAME_GENS, RANK_COLORS, PATTERNS, NAMES,
+  QR, BOARD_CLASSES, PAD, POINTS, GAME_GENS, RANK_COLORS, PATTERNS, NAMES, voice,
   rankOf, maxBytes, boardSize, seedFor, Game, createGame: (text, cls) => new Game(text, cls),
 };
 })();
