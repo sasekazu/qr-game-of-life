@@ -838,6 +838,9 @@ function step() {
 }
 
 /* ---- famous patterns ---- */
+// [id, rank, period, first phase]. The rank is the rarity: the share of ~1100 QR "soups" (every printable ASCII
+// character plus random strings, run for 1000 generations) in which the pattern ever appeared:
+//   1: 95%+   2: 60-95%   3: 15-60%   4: 3-15%   5: under 3%   (measure again with the tally script after changes)
 const PATTERNS = [
   ["block", 1, 1, "OO/OO"],
   ["beehive", 1, 1, ".OO./O..O/.OO."],
@@ -845,12 +848,12 @@ const PATTERNS = [
   ["boat", 2, 1, "OO./O.O/.O."],
   ["ship", 3, 1, "OO./O.O/.OO"],
   ["tub", 2, 1, ".O./O.O/.O."],
-  ["pond", 3, 1, ".OO./O..O/O..O/.OO."],
+  ["pond", 2, 1, ".OO./O..O/O..O/.OO."],
   ["blinker", 1, 2, "OOO"],
-  ["toad", 2, 2, ".OOO/OOO."],
-  ["beacon", 3, 2, "OO../OO../..OO/..OO"],
+  ["toad", 3, 2, ".OOO/OOO."],
+  ["beacon", 4, 2, "OO../OO../..OO/..OO"],
   ["pulsar", 5, 3, "..OOO...OOO../............./O....O.O....O/O....O.O....O/O....O.O....O/..OOO...OOO../............./..OOO...OOO../O....O.O....O/O....O.O....O/O....O.O....O/............./..OOO...OOO.."],
-  ["glider", 4, 4, ".O./..O/OOO"],
+  ["glider", 2, 4, ".O./..O/OOO"],
   ["lwss", 5, 4, "O..O./....O/O...O/.OOOO"],
   ["snake", 5, 1, "OO.O/O.OO"],
   ["carrier", 5, 1, "OO../O..O/..OO"],
