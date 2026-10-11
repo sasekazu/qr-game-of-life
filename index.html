@@ -25,6 +25,7 @@
     padding: 32px 16px;
   }
   .logo { width: 24px; height: 24px; flex: none; image-rendering: pixelated; }
+  h1 #appSub:not(:empty) { font-size: 10px; font-weight: 500; letter-spacing: .18em; opacity: .65; }
   h1 { margin: 0; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: var(--sub); }
   .subtitle { margin: 2px 0 0; font-size: 11px; letter-spacing: .08em; color: var(--sub); text-align: center; }
   .card {
@@ -201,7 +202,7 @@
 </head>
 <body>
   <header style="text-align:center">
-    <h1><img class="logo" src="logo.svg" alt="" width="24" height="24">Toad Hunt</h1>
+    <h1><img class="logo" src="logo.svg" alt="" width="24" height="24"><span id="appName">Toad Hunt</span><span id="appSub"></span></h1>
     <p class="subtitle">A QR Game of Life Challenge</p>
   </header>
   <main class="card">
@@ -1281,7 +1282,7 @@ const I18N = {
              figure8: "Figure eight", mwss: "Middleweight spaceship", hwss: "Heavyweight spaceship", rpent: "R-pentomino" },
   },
   ja: {
-    label: "JA",
+    label: "JA", appName: "ヒキガエルハント", appSub: "Toad Hunt",
     placeholder: "文字やURLを入力…", start: "開始", qr: "QRコードのプレビュー",
     hint: "↵ Enter か ▶ で、QRコードがライフゲームになります",
     tooLong: n => `長すぎます（最大 ${n} バイト）`,
@@ -1297,7 +1298,7 @@ const I18N = {
     classSmall: "小さい盤面", classLarge: "大きい盤面", upTo: n => `最大 ${n} バイト`,
     share: {
       x: "Xで共有", copy: "コピー", copied: "コピーしました", copyFail: "コピー失敗",
-      score: (n, board) => `Toad Hunt (${board})で${n}点を獲得！`, small: "Small Board", large: "Large Board", cta: "あなたは何点取れる？",
+      score: (n, board) => `ヒキガエルハント Toad Hunt (${board})で${n}点を獲得！`, small: "Small Board", large: "Large Board", cta: "あなたは何点取れる？",
     },
     rank: {
       title: "ランキング · 上位10人", btn: "ランキング", namePh: "名前", post: "登録", refresh: "更新", loading: "読み込み中…",
@@ -1435,6 +1436,10 @@ function renderGuide() {
 function applyLang() {
   const t = T();
   document.documentElement.lang = lang;
+  const appName = t.appName || "Toad Hunt";
+  $("appName").textContent = appName;
+  $("appSub").textContent = t.appSub || "";
+  document.title = t.appSub ? `${appName} · ${t.appSub}` : appName;
   text.placeholder = t.placeholder;
   goBtn.innerHTML = ICON.play(22);
   goBtn.title = t.start;
