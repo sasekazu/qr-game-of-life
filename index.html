@@ -255,7 +255,6 @@
         <button id="rankBtn" class="ghost icon" hidden></button>
         <button id="lang" class="ghost lang"></button>
         <button id="snd" class="ghost icon" aria-pressed="true"></button>
-        <button id="toggle" class="ghost icon" disabled></button>
         <button id="reset" class="ghost icon" disabled></button>
       </span>
     </div>
@@ -1362,7 +1361,7 @@ const ICON = {
   glider: size => svg('<g fill="currentColor" stroke="none"><rect x="9" y="2" width="6" height="6" rx="1"/><rect x="16" y="9" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/></g>', size),
 };
 
-const goBtn = $("go"), hint = $("hint"), toggleBtn = $("toggle"), resetBtn = $("reset"), sndBtn = $("snd"), langBtn = $("lang"), clsBtn = $("cls"), countEl = $("count"), guideBtn = $("guideBtn"), guide = $("guide"), guideList = $("guideList");
+const goBtn = $("go"), hint = $("hint"), resetBtn = $("reset"), sndBtn = $("snd"), langBtn = $("lang"), clsBtn = $("cls"), countEl = $("count"), guideBtn = $("guideBtn"), guide = $("guide"), guideList = $("guideList");
 let pending = null;                  // QR of the text now in the box (null: empty or too long)
 let hintState = { tooLong: 0 };      // tooLong: the byte limit to show, or 0
 
@@ -1393,12 +1392,13 @@ function renderHint() {
   hint.textContent = hintState.tooLong ? T().tooLong(hintState.tooLong) : T().hint;
   hint.classList.toggle("err", !!hintState.tooLong);
 }
+const inGame = () => hasQR && !finished && !demo;      // a player's own game that is not over (running or paused)
 function syncButtons() {
   const t = T();
-  toggleBtn.innerHTML = running ? ICON.pause() : ICON.play();
-  toggleBtn.title = running ? t.pause : t.resume;
-  toggleBtn.setAttribute("aria-label", toggleBtn.title);
-  toggleBtn.disabled = !hasQR || finished;
+  const playing = inGame() && running;                // the top button: pause while a game runs, otherwise play
+  goBtn.innerHTML = playing ? ICON.pause(22) : ICON.play(22);
+  goBtn.title = playing ? t.pause : inGame() ? t.resume : t.start;
+  goBtn.setAttribute("aria-label", goBtn.title);
   resetBtn.disabled = !hasQR;
 }
 function classLabel() {
@@ -1450,9 +1450,6 @@ function applyLang() {
   $("modeSingle").textContent = t.modeSingle; $("modeBattle").textContent = t.modeBattle;
   document.querySelector(".modes").setAttribute("aria-label", t.modes);
   text.placeholder = t.placeholder;
-  goBtn.innerHTML = ICON.play(22);
-  goBtn.title = t.start;
-  goBtn.setAttribute("aria-label", t.start);
   qrCanvas.setAttribute("aria-label", t.qr);
   note.textContent = t.note;
   renderDemo();
@@ -1757,7 +1754,11 @@ text.addEventListener("keydown", e => {
   // Enter while an IME is converting text only confirms the conversion
   if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); start(); }
 });
-goBtn.onclick = start;
+goBtn.onclick = () => {                               // pause / resume a game in progress, else start one
+  if (!inGame()) { start(); return; }
+  running = !running;
+  syncButtons();
+};
 $("shareCopy").onclick = copyShare;
 $("again").onclick = () => { audioWake(); load(seed, N); holding = false; running = true; syncButtons(); };
 clsBtn.onclick = () => {                              // switch class: the board and its limits change, so re-preview
@@ -1784,7 +1785,6 @@ langBtn.onclick = () => {
   try { localStorage.setItem("qrlife-lang", lang); } catch (e) { /* ignore */ }
   applyLang();
 };
-toggleBtn.onclick = () => { running = !running; syncButtons(); };
 resetBtn.onclick = () => { audioWake(); load(seed, N); holding = false; running = true; syncButtons(); };
 
 load(new Uint8Array(45 * 45), 45);   // empty board until the first start
