@@ -1261,6 +1261,7 @@ const I18N = {
     hint: "Press ↵ Enter or ▶ to turn the QR code into Life",
     tooLong: n => `Too long (max ${n} bytes)`,
     confirmReset: "Changing the text resets the current game. Continue?",
+    confirmRestart: "Restarting resets the current game. Continue?",
     note: "Type something, then press ↵",
     demo: "DEMO PLAYING", demoSkip: "Skip",
     board: "Game of Life",
@@ -1294,6 +1295,7 @@ const I18N = {
     hint: "↵ Enter か ▶ で、QRコードがライフゲームになります",
     tooLong: n => `長すぎます（最大 ${n} バイト）`,
     confirmReset: "文字を変更すると、実行中のゲームがリセットされます。変更しますか？",
+    confirmRestart: "最初からやり直すと、実行中のゲームがリセットされます。やり直しますか？",
     note: "入力して ↵ で開始",
     demo: "デモ再生中", demoSkip: "スキップ",
     board: "ライフゲーム",
@@ -1806,7 +1808,7 @@ langBtn.onclick = () => {
   try { localStorage.setItem("qrlife-lang", lang); } catch (e) { /* ignore */ }
   applyLang();
 };
-resetBtn.onclick = () => { audioWake(); load(seed, N); holding = false; running = true; syncButtons(); };
+resetBtn.onclick = () => { if (inGame() && !confirm(T().confirmRestart)) return; audioWake(); load(seed, N); holding = false; running = true; syncButtons(); };
 
 load(new Uint8Array(45 * 45), 45);   // empty board until the first start
 applyLang();
