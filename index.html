@@ -1262,6 +1262,7 @@ const I18N = {
     tooLong: n => `Too long (max ${n} bytes)`,
     confirmReset: "Changing the text resets the current game. Continue?",
     confirmRestart: "Restarting resets the current game. Continue?",
+    confirmClass: "Changing the board size resets the current game. Continue?",
     note: "Type something, then press ↵",
     demo: "DEMO PLAYING", demoSkip: "Skip",
     board: "Game of Life",
@@ -1296,6 +1297,7 @@ const I18N = {
     tooLong: n => `長すぎます（最大 ${n} バイト）`,
     confirmReset: "文字を変更すると、実行中のゲームがリセットされます。変更しますか？",
     confirmRestart: "最初からやり直すと、実行中のゲームがリセットされます。やり直しますか？",
+    confirmClass: "盤面を変更すると、実行中のゲームがリセットされます。変更しますか？",
     note: "入力して ↵ で開始",
     demo: "デモ再生中", demoSkip: "スキップ",
     board: "ライフゲーム",
@@ -1785,6 +1787,7 @@ goBtn.onclick = () => {                               // pause / resume a game i
 $("shareCopy").onclick = copyShare;
 $("again").onclick = () => { audioWake(); load(seed, N); holding = false; running = true; syncButtons(); };
 clsBtn.onclick = () => {                              // switch class: the board and its limits change, so re-preview
+  if (inGame() && !confirm(T().confirmClass)) return;
   const names = Object.keys(BOARD_CLASSES);
   boardClass = names[(names.indexOf(boardClass) + 1) % names.length];
   try { localStorage.setItem("qrlife-class", boardClass); } catch (e) { /* ignore */ }
