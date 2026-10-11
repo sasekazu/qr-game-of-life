@@ -43,3 +43,4 @@ for (const [id, rank, period, art] of ctx.PATTERNS) {
   if (problems.length) bad++;
 }
 console.log(bad ? `${bad} problem pattern(s)` : "all patterns OK");
+if (bad) process.exitCode = 1;          // so a script or CI step can tell that a pattern is broken
