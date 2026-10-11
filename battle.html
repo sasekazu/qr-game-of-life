@@ -147,7 +147,6 @@
     </div>
     <div class="btns">
       <span class="gen" id="genbox"><span id="genicon"></span><span id="gen">0</span><span id="genMax"></span></span>
-      <button id="cls" class="ghost icon"></button>
       <button id="lang" class="ghost lang"></button>
       <button id="snd" class="ghost icon"></button>
       <button id="pause" class="ghost icon" disabled></button>
@@ -187,7 +186,6 @@ const I18N = {
     tooLong: n => `A text is too long (max ${n} bytes)`,
     start: "Start battle", restart: "Restart battle", pause: "Pause", resume: "Resume", lang: "Language", gen: "Generation",
     soundOn: "Sound on", soundOff: "Sound off",
-    classSmall: "Small board", classLarge: "Large board", upTo: n => `up to ${n} bytes`,
     even: "Even", leads: (n, d) => `Player ${n} leads by ${d}`,
     wins: n => `Player ${n} wins!`, draw: "It's a draw!", rematch: "Rematch", newTexts: "New texts", close: "Close",
     endLimit: g => `${g} generations`, endSettled: g => `settled at generation ${g}`, rarity: r => `Rarity ${r} / 5`,
@@ -200,7 +198,6 @@ const I18N = {
     tooLong: n => `長すぎる文字があります（最大 ${n} バイト）`,
     start: "対戦開始", restart: "最初からやり直す", pause: "一時停止", resume: "再開", lang: "言語", gen: "世代",
     soundOn: "音あり", soundOff: "音なし",
-    classSmall: "小さい盤面", classLarge: "大きい盤面", upTo: n => `最大 ${n} バイト`,
     even: "互角", leads: (n, d) => `プレイヤー${n}が${d}点リード`,
     wins: n => `プレイヤー${n}の勝ち！`, draw: "引き分け！", rematch: "再戦", newTexts: "文字を変える", close: "閉じる",
     endLimit: g => `${g}世代`, endSettled: g => `${g}世代で繰り返し`, rarity: r => `レア度 ${r} / 5`,
@@ -230,18 +227,10 @@ const ICON = {
   soundOff: s => svg('<path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>', s),
   trophy: s => svg('<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4"/><path d="M12 13v4M8 20h8M10 17h4"/>', s),
   glider: s => svg('<g fill="currentColor" stroke="none"><rect x="9" y="2" width="6" height="6" rx="1"/><rect x="16" y="9" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/></g>', s),
-  grid: (n, s) => {
-    const cell = 20 / (n + (n - 1) * 0.5), gap = cell * 0.5;
-    let r = "";
-    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++)
-      r += `<rect x="${2 + x * (cell + gap)}" y="${2 + y * (cell + gap)}" width="${cell}" height="${cell}" rx="${cell * 0.2}"/>`;
-    return svg(`<g fill="currentColor" stroke="none">${r}</g>`, s);
-  },
 };
 
 /* ===================== board class ===================== */
-let boardClass = "small";
-try { const c = localStorage.getItem("qrlife-class"); if (c in E.BOARD_CLASSES) boardClass = c; } catch (e) { /* ignore */ }
+const boardClass = "large";   // the small class is retired from the UI; the engine still supports it
 const maxBytes = () => E.maxBytes(boardClass);
 
 /* ===================== the two players ===================== */
@@ -511,9 +500,9 @@ $("rRematch").onclick = () => startBattle();
 $("rNew").onclick = () => { $("result").close(); players.forEach(p => { p.input.value = ""; p.lastValue = ""; }); backToPreview(); players[0].input.focus(); };
 $("result").addEventListener("click", e => { if (e.target === $("result")) $("result").close(); });
 
-/* ---- buttons, class, language ---- */
+/* ---- buttons, language ---- */
 function syncControls() {
-  const t = T(), size = E.boardSize(boardClass) - E.PAD * 2;
+  const t = T();
   const inMatch = state === "running";
   $("start").innerHTML = state === "idle" ? ICON.play(24) : ICON.restart(24);
   $("start").title = state === "idle" ? t.start : t.restart;
@@ -527,9 +516,6 @@ function syncControls() {
   $("snd").title = soundOn ? t.soundOn : t.soundOff;
   $("snd").setAttribute("aria-label", $("snd").title);
   $("snd").setAttribute("aria-pressed", soundOn);
-  $("cls").innerHTML = ICON.grid(boardClass === "small" ? 3 : 5);
-  $("cls").title = `${boardClass === "small" ? t.classSmall : t.classLarge} · ${size}×${size} · ${t.upTo(maxBytes())}`;
-  $("cls").setAttribute("aria-label", $("cls").title);
   const hint = $("hint");
   hint.textContent = tooLong() ? t.tooLong(maxBytes()) : state === "idle" && !ready() ? t.hint : state === "idle" ? t.start : "";
   hint.classList.toggle("err", tooLong());
@@ -555,14 +541,6 @@ $("lang").onclick = () => {
   lang = codes[(codes.indexOf(lang) + 1) % codes.length];
   try { localStorage.setItem("qrlife-lang", lang); } catch (e) { /* ignore */ }
   applyLang();
-};
-$("cls").onclick = () => {
-  const names = Object.keys(E.BOARD_CLASSES);
-  boardClass = names[(names.indexOf(boardClass) + 1) % names.length];
-  try { localStorage.setItem("qrlife-class", boardClass); } catch (e) { /* ignore */ }
-  players.forEach(p => { enforceLimit(p); p.lastValue = p.input.value; });
-  backToPreview();
-  syncControls();
 };
 $("pause").onclick = () => { running = !running; syncControls(); };
 $("snd").onclick = () => {

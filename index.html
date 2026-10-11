@@ -190,9 +190,6 @@
   .post input:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
   .post button { height: 36px; border-radius: 12px; }
   .post-msg { margin: 6px 24px 0; font-size: 12.5px; color: var(--sub); text-align: center; }
-  .rank-tabs { display: flex; gap: 6px; padding: 0 22px 8px; }
-  .rank-tabs button { padding: 5px 14px; font-size: 12.5px; }
-  .rank-tabs button[aria-pressed="true"] { background: var(--ink); color: #fff; }
   #rankList { list-style: none; margin: 0; padding: 0 14px 6px; overflow-y: auto; min-height: 120px; }
   #rankList li { display: flex; align-items: baseline; gap: 12px; padding: 9px 8px; border-top: 1px solid var(--line); font-size: 15px; }
   #rankList li:first-child { border-top: 0; }
@@ -250,7 +247,6 @@
         <span class="gen" id="scorebox"><span id="scoreicon"></span><span id="score">0</span></span>
       </span>
       <span class="btns">
-        <button id="cls" class="ghost icon"></button>
         <button id="guideBtn" class="ghost icon"></button>
         <button id="rankBtn" class="ghost icon" hidden></button>
         <button id="lang" class="ghost lang"></button>
@@ -268,7 +264,6 @@
 
   <dialog id="rankDlg">
     <div class="guide-head"><h2 id="rankTitle"></h2><button id="rankClose" class="ghost icon"></button></div>
-    <div class="rank-tabs" id="rankTabs"></div>
     <ul id="rankList" aria-live="polite"></ul>
     <div class="rank-foot"><button id="rankRefresh" class="ghost icon"></button></div>
   </dialog>
@@ -521,8 +516,7 @@ const PAD = 12, FPS = 12;
 // the same size with a similar number of live cells: games in a class are comparable.
 //   small: QR version 1 = 21 x 21 modules, up to 14 bytes     large: version 6 = 41 x 41, up to 106 bytes
 const BOARD_CLASSES = { small: 1, large: 6 };
-let boardClass = "small";
-try { const c = localStorage.getItem("qrlife-class"); if (c in BOARD_CLASSES) boardClass = c; } catch (e) { /* storage unavailable */ }
+const boardClass = "large";   // the small class is retired from the UI and the ranking; the engine still supports it
 const qrVersion = () => BOARD_CLASSES[boardClass];
 const boardSize = () => 17 + 4 * qrVersion();
 const CELL_H = 0.5;      // height of a living cell (cube column)
@@ -1079,7 +1073,7 @@ function topPatterns() {                              // [{ id, count }]: every 
 function shareText() {
   const t = T().share, r = resultInfo;
   return [
-    t.score(r.score.toLocaleString("en-US"), r.cls === "small" ? t.small : t.large),
+    t.score(r.score.toLocaleString("en-US")),
     ...r.top.map(p => `${patName(p.id)}${p.count > 1 ? ` × ${p.count}` : ""}`),
     t.cta,
     "#ToadHunt",
@@ -1262,7 +1256,6 @@ const I18N = {
     tooLong: n => `Too long (max ${n} bytes)`,
     confirmReset: "Changing the text resets the current game. Continue?",
     confirmRestart: "Restarting resets the current game. Continue?",
-    confirmClass: "Changing the board size resets the current game. Continue?",
     note: "Type something, then press ↵",
     demo: "DEMO PLAYING", demoSkip: "Skip",
     board: "Game of Life",
@@ -1272,10 +1265,9 @@ const I18N = {
     guide: "Pattern guide", close: "Close",
     progress: "Progress", score: "Score", best: n => `Best ${n}`, newBest: "New best!", replay: "Replay",
     endLimit: n => `${n} generations played`, endSettled: g => `Nothing new can happen: the board repeats itself (generation ${g})`,
-    classSmall: "Small board", classLarge: "Large board", upTo: n => `up to ${n} bytes`,
     share: {
       x: "Share on X", copy: "Copy", copied: "Copied!", copyFail: "Copy failed",
-      score: (n, board) => `I scored ${n} on Toad Hunt (${board})!`, small: "Small Board", large: "Large Board", cta: "How high can you score?",
+      score: n => `I scored ${n} on Toad Hunt!`, cta: "How high can you score?",
     },
     rank: {
       title: "Ranking · Top 10", btn: "Ranking", namePh: "Your name", post: "Post", refresh: "Refresh", loading: "Loading…",
@@ -1297,7 +1289,6 @@ const I18N = {
     tooLong: n => `長すぎます（最大 ${n} バイト）`,
     confirmReset: "文字を変更すると、実行中のゲームがリセットされます。変更しますか？",
     confirmRestart: "最初からやり直すと、実行中のゲームがリセットされます。やり直しますか？",
-    confirmClass: "盤面を変更すると、実行中のゲームがリセットされます。変更しますか？",
     note: "入力して ↵ で開始",
     demo: "デモ再生中", demoSkip: "スキップ",
     board: "ライフゲーム",
@@ -1307,10 +1298,9 @@ const I18N = {
     guide: "パターン一覧", close: "閉じる",
     progress: "進捗", score: "得点", best: n => `ベスト ${n}`, newBest: "ベスト更新！", replay: "もう一度見る",
     endLimit: n => `${n}世代まで到達`, endSettled: g => `${g}世代で同じ動きの繰り返しになりました（もう新しいパターンは出ません）`,
-    classSmall: "小さい盤面", classLarge: "大きい盤面", upTo: n => `最大 ${n} バイト`,
     share: {
       x: "Xで共有", copy: "コピー", copied: "コピーしました", copyFail: "コピー失敗",
-      score: (n, board) => `ヒキガエルハント Toad Hunt (${board})で${n}点を獲得！`, small: "Small Board", large: "Large Board", cta: "あなたは何点取れる？",
+      score: n => `ヒキガエルハント Toad Huntで${n}点を獲得！`, cta: "あなたは何点取れる？",
     },
     rank: {
       title: "ランキング · 上位10人", btn: "ランキング", namePh: "名前", post: "登録", refresh: "更新", loading: "読み込み中…",
@@ -1349,14 +1339,6 @@ const ICON = {
   restart: size => svg('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v5h5"/>', size),
   soundOn: size => svg(SPK + '<path d="M15.5 9a4.5 4.5 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/>', size),
   soundOff: size => svg(SPK + '<path d="M16 9.5l5 5M21 9.5l-5 5"/>', size),
-  // a grid of n x n small squares: few big squares = small board, many small squares = large board
-  grid: (n, size) => {
-    const cell = 20 / (n + (n - 1) * 0.5), gap = cell * 0.5;
-    let r = "";
-    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++)
-      r += `<rect x="${2 + x * (cell + gap)}" y="${2 + y * (cell + gap)}" width="${cell}" height="${cell}" rx="${cell * 0.2}"/>`;
-    return svg(`<g fill="currentColor" stroke="none">${r}</g>`, size);
-  },
   trophy: size => svg('<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4"/><path d="M12 13v4M8 20h8M10 17h4"/>', size),
   podium: size => svg('<rect x="3" y="12" width="5" height="8" rx="1"/><rect x="9.5" y="5" width="5" height="15" rx="1"/><rect x="16" y="14" width="5" height="6" rx="1"/>', size),
   book: size => svg('<path d="M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2z"/><path d="M4 20a2 2 0 0 1 2-2h13v3H6a2 2 0 0 1-2-1z"/><path d="M9 7.5h6"/>', size),
@@ -1367,7 +1349,7 @@ const ICON = {
   glider: size => svg('<g fill="currentColor" stroke="none"><rect x="9" y="2" width="6" height="6" rx="1"/><rect x="16" y="9" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/></g>', size),
 };
 
-const goBtn = $("go"), hint = $("hint"), resetBtn = $("reset"), sndBtn = $("snd"), langBtn = $("lang"), clsBtn = $("cls"), countEl = $("count"), guideBtn = $("guideBtn"), guide = $("guide"), guideList = $("guideList");
+const goBtn = $("go"), hint = $("hint"), resetBtn = $("reset"), sndBtn = $("snd"), langBtn = $("lang"), countEl = $("count"), guideBtn = $("guideBtn"), guide = $("guide"), guideList = $("guideList");
 let pending = null;                  // QR of the text now in the box (null: empty or too long)
 let hintState = { tooLong: 0 };      // tooLong: the byte limit to show, or 0
 
@@ -1407,15 +1389,6 @@ function syncButtons() {
   goBtn.setAttribute("aria-label", goBtn.title);
   resetBtn.disabled = !hasQR;
 }
-function classLabel() {
-  const t = T(), n = boardSize();
-  return `${boardClass === "small" ? t.classSmall : t.classLarge} · ${n}×${n} · ${t.upTo(QR.maxBytes(qrVersion(), 1))}`;
-}
-function syncClass() {
-  clsBtn.innerHTML = ICON.grid(boardClass === "small" ? 3 : 5);
-  clsBtn.title = classLabel();
-  clsBtn.setAttribute("aria-label", clsBtn.title);
-}
 function syncSound() {
   const t = T();
   sndBtn.innerHTML = soundOn ? ICON.soundOn() : ICON.soundOff();
@@ -1435,7 +1408,7 @@ function patternSVG(art, color) {
 }
 function renderGuide() {
   const t = T();
-  $("guideTitle").textContent = `${t.guide} · ${boardClass === "small" ? t.classSmall : t.classLarge}`;
+  $("guideTitle").textContent = t.guide;
   guideList.innerHTML = PATTERNS
     .map((pt, i) => ({ id: pt[0], rank: rankOf(pt[0]), art: pt[3], i }))
     .sort((a, b) => b.rank - a.rank || a.i - b.i)
@@ -1491,7 +1464,6 @@ function applyLang() {
   renderHint();
   syncButtons();
   syncSound();
-  syncClass();
 }
 
 /* ===================== Online ranking (optional, see RANKING.md) ===================== */
@@ -1500,7 +1472,7 @@ function applyLang() {
 const rankBtn = $("rankBtn"), rankDlg = $("rankDlg"), rankList = $("rankList"), postForm = $("post"), postName = $("postName");
 let rankingOn = false, rankLoading = null;
 let postCls = null, postScore = 0, postMsg = null;            // the finished game on offer, and the message under the form
-let rankCls = "small", rankState = { kind: "loading" };
+let rankCls = boardClass, rankState = { kind: "loading" };
 try { postName.value = localStorage.getItem("qrlife-name") || ""; } catch (e) { /* storage unavailable */ }
 
 const loadRanking = () => rankLoading ??= import("./ranking.js").catch(e => { rankLoading = null; throw e; });
@@ -1554,20 +1526,11 @@ function renderRankStatic() {                                 // texts that depe
   $("rankRefresh").innerHTML = ICON.restart();
   $("rankRefresh").title = r.refresh;
   $("rankRefresh").setAttribute("aria-label", r.refresh);
-  const tabs = $("rankTabs");
-  tabs.replaceChildren(...Object.keys(BOARD_CLASSES).map(cls => {
-    const b = document.createElement("button");
-    b.className = "ghost"; b.dataset.cls = cls;
-    b.textContent = cls === "small" ? t.classSmall : t.classLarge;
-    b.onclick = () => { rankCls = cls; loadRankRows(false); };
-    return b;
-  }));
   renderPost();
   renderRank();
 }
 function renderRank() {                                       // names go in with textContent, never as HTML
   const t = T().rank;
-  for (const b of $("rankTabs").children) b.setAttribute("aria-pressed", b.dataset.cls === rankCls);
   const msg = text => { const li = document.createElement("li"); li.className = "msg"; li.textContent = text; return [li]; };
   if (rankState.kind === "loading") rankList.replaceChildren(...msg(t.loading));
   else if (rankState.kind === "error") rankList.replaceChildren(...msg(t.error));
@@ -1786,15 +1749,6 @@ goBtn.onclick = () => {                               // pause / resume a game i
 };
 $("shareCopy").onclick = copyShare;
 $("again").onclick = () => { audioWake(); load(seed, N); holding = false; running = true; syncButtons(); };
-clsBtn.onclick = () => {                              // switch class: the board and its limits change, so re-preview
-  if (inGame() && !confirm(T().confirmClass)) return;
-  const names = Object.keys(BOARD_CLASSES);
-  boardClass = names[(names.indexOf(boardClass) + 1) % names.length];
-  try { localStorage.setItem("qrlife-class", boardClass); } catch (e) { /* ignore */ }
-  syncClass();
-  renderGuide();
-  preview();
-};
 guideBtn.onclick = () => guide.showModal();
 $("guideClose").onclick = () => guide.close();
 guide.addEventListener("click", e => { if (e.target === guide) guide.close(); });   // click on the backdrop
