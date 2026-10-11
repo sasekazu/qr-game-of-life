@@ -1260,6 +1260,7 @@ const I18N = {
     placeholder: "Type text or a URL…", start: "Start", qr: "QR code preview",
     hint: "Press ↵ Enter or ▶ to turn the QR code into Life",
     tooLong: n => `Too long (max ${n} bytes)`,
+    confirmReset: "Changing the text resets the current game. Continue?",
     note: "Type something, then press ↵",
     demo: "DEMO PLAYING", demoSkip: "Skip",
     board: "Game of Life",
@@ -1292,6 +1293,7 @@ const I18N = {
     placeholder: "文字やURLを入力…", start: "開始", qr: "QRコードのプレビュー",
     hint: "↵ Enter か ▶ で、QRコードがライフゲームになります",
     tooLong: n => `長すぎます（最大 ${n} バイト）`,
+    confirmReset: "文字を変更すると、実行中のゲームがリセットされます。変更しますか？",
     note: "入力して ↵ で開始",
     demo: "デモ再生中", demoSkip: "スキップ",
     board: "ライフゲーム",
@@ -1748,8 +1750,27 @@ function onTextChanged() {
   lastValue = text.value;
   preview();
 }
-text.addEventListener("input", e => { if (e.isComposing) preview(); else onTextChanged(); });
-text.addEventListener("compositionend", onTextChanged);
+// Editing the text replaces the running game with a new preview, so ask first. A plain edit can be cancelled
+// outright; an IME composition cannot, so a declined one is dropped when it ends.
+let rejectComposition = false;
+const confirmReset = () => !inGame() || confirm(T().confirmReset);
+text.addEventListener("beforeinput", e => {
+  if (e.isComposing || e.inputType === "insertCompositionText") return;
+  if (!confirmReset()) e.preventDefault();
+});
+text.addEventListener("compositionstart", () => {
+  if (confirmReset()) return;
+  rejectComposition = true;
+  text.blur();
+});
+text.addEventListener("input", e => {
+  if (rejectComposition) return;
+  if (e.isComposing) preview(); else onTextChanged();
+});
+text.addEventListener("compositionend", () => {
+  if (rejectComposition) { rejectComposition = false; text.value = lastValue; return; }
+  onTextChanged();
+});
 text.addEventListener("keydown", e => {
   // Enter while an IME is converting text only confirms the conversion
   if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); start(); }
