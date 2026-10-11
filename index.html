@@ -1023,7 +1023,7 @@ function finish(reason) {
   try { prev = +localStorage.getItem(key) || 0; } catch (e) { /* storage unavailable */ }
   const isBest = score > prev;
   if (isBest) { try { localStorage.setItem(key, score); } catch (e) { /* ignore */ } }
-  resultInfo = { score, best: Math.max(prev, score), isBest, reason, gen, cls: boardClass, top: topPattern() };
+  resultInfo = { score, best: Math.max(prev, score), isBest, reason, gen, cls: boardClass, top: topPatterns() };
   renderResult();
   syncButtons();
   playRank(isBest ? 5 : 3);
@@ -1046,24 +1046,23 @@ function renderResult() {
 // (same text -> same score), so the input text, the QR code and anything derived from them are never shared, and the
 // link is the plain top page (no query, no hash). Sharing never touches the ranking (see offerPost()).
 const SHARE_URL = "https://sasekazu.github.io/qrlife/";
-function topPattern() {                               // the rarest pattern found, the most frequent of those; null when none
-  let best = null;
-  for (const id in found) {
-    const rank = rankOf(id), count = found[id];
-    if (!best || rank > best.rank || (rank === best.rank && count > best.count)) best = { id, rank, count };
-  }
-  return best && { id: best.id, count: best.count };
+const SHARE_PATTERNS = 3;                             // kinds listed at least (more only when the rarest rank has more kinds)
+function topPatterns() {                              // [{ id, count }]: every kind of the rarest rank, then the next rarest up to SHARE_PATTERNS
+  const all = Object.keys(found).map(id => ({ id, rank: rankOf(id), count: found[id] }))
+    .sort((a, b) => b.rank - a.rank || b.count - a.count);
+  if (!all.length) return [];
+  const top = all.filter(p => p.rank === all[0].rank), rest = all.slice(top.length);
+  return top.concat(rest.slice(0, Math.max(0, SHARE_PATTERNS - top.length))).map(p => ({ id: p.id, count: p.count }));
 }
 function shareText() {
   const t = T().share, r = resultInfo;
   return [
-    t.score(r.score.toLocaleString("en-US")),
-    r.cls === "small" ? t.small : t.large,
-    r.top && `${patName(r.top.id)}${r.top.count > 1 ? ` × ${r.top.count}` : ""}`,
+    t.score(r.score.toLocaleString("en-US"), r.cls === "small" ? t.small : t.large),
+    ...r.top.map(p => `${patName(p.id)}${p.count > 1 ? ` × ${p.count}` : ""}`),
     t.cta,
     "#QRLife",
     SHARE_URL,
-  ].filter(Boolean).join("\n");
+  ].join("\n");
 }
 function renderShare() {
   if (!resultInfo) return;                            // (the "Copied!" timer can fire after a new game began)
@@ -1251,7 +1250,7 @@ const I18N = {
     classSmall: "Small board", classLarge: "Large board", upTo: n => `up to ${n} bytes`,
     share: {
       x: "Share on X", copy: "Copy", copied: "Copied!", copyFail: "Copy failed",
-      score: n => `I scored ${n} on QR Life!`, small: "Small Board", large: "Large Board", cta: "How high can you score?",
+      score: (n, board) => `I scored ${n} on QR Life (${board})!`, small: "Small Board", large: "Large Board", cta: "How high can you score?",
     },
     rank: {
       title: "Ranking · Top 10", btn: "Ranking", namePh: "Your name", post: "Post", refresh: "Refresh", loading: "Loading…",
@@ -1283,7 +1282,7 @@ const I18N = {
     classSmall: "小さい盤面", classLarge: "大きい盤面", upTo: n => `最大 ${n} バイト`,
     share: {
       x: "Xで共有", copy: "コピー", copied: "コピーしました", copyFail: "コピー失敗",
-      score: n => `QR Lifeで${n}点を獲得！`, small: "Small Board", large: "Large Board", cta: "あなたは何点取れる？",
+      score: (n, board) => `QR Life (${board})で${n}点を獲得！`, small: "Small Board", large: "Large Board", cta: "あなたは何点取れる？",
     },
     rank: {
       title: "ランキング · 上位10人", btn: "ランキング", namePh: "名前", post: "登録", refresh: "更新", loading: "読み込み中…",
