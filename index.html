@@ -150,6 +150,11 @@
     #log li > span:first-child { min-width: 3.4em; }
     #log .s { letter-spacing: .04em; }
   }
+  /* demo autoplay: a quiet tag on the board, with a way out */
+  .demo[hidden] { display: none; }
+  .demo { position: absolute; z-index: 2; left: 8px; right: 8px; top: 8px; display: flex; align-items: center; gap: 8px; pointer-events: none; font-size: 11.5px; letter-spacing: .06em; color: var(--sub); }
+  .demo .tag { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.85); border: 1px solid var(--line); }
+  .demo button { flex: none; margin-left: auto; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 11.5px; pointer-events: auto; }
   .note[hidden] { display: none; }
   .note { position: absolute; inset: 0; display: grid; place-items: center; color: var(--sub); pointer-events: none; }
   /* online ranking */
@@ -203,6 +208,7 @@
         </div>
       </div>
       <div class="note" id="note"></div>
+      <div class="demo" id="demo" hidden><span class="tag" id="demoTag"></span><button id="demoSkip" class="ghost"></button></div>
     </div>
     <div class="progress" id="progress" role="progressbar" aria-valuemin="0">
       <i id="progressFill"></i><b class="tick" style="left:25%"></b><b class="tick" style="left:50%"></b><b class="tick" style="left:75%"></b>
@@ -1002,6 +1008,7 @@ function addScore(points) {
 }
 function finish(reason) {
   finished = true; running = false; holding = false;
+  if (demo) { syncButtons(); scheduleDemoReplay(); return; }   // the demo keeps no best, no result, no sound, no ranking
   const key = "qrlife-best-" + boardClass;
   let prev = 0;
   try { prev = +localStorage.getItem(key) || 0; } catch (e) { /* storage unavailable */ }
@@ -1175,6 +1182,7 @@ const I18N = {
     hint: "Press ↵ Enter or ▶ to turn the QR code into Life",
     tooLong: n => `Too long (max ${n} bytes)`,
     note: "Type something, then press ↵",
+    demo: "DEMO PLAYING", demoSkip: "Skip",
     board: "Game of Life",
     gen: "Generation", soundOn: "Sound on", soundOff: "Sound off",
     pause: "Pause", resume: "Resume", restart: "Restart", lang: "Language",
@@ -1202,6 +1210,7 @@ const I18N = {
     hint: "↵ Enter か ▶ で、QRコードがライフゲームになります",
     tooLong: n => `長すぎます（最大 ${n} バイト）`,
     note: "入力して ↵ で開始",
+    demo: "デモ再生中", demoSkip: "スキップ",
     board: "ライフゲーム",
     gen: "世代", soundOn: "音あり", soundOff: "音なし",
     pause: "一時停止", resume: "再開", restart: "最初から", lang: "言語",
@@ -1351,6 +1360,7 @@ function applyLang() {
   goBtn.setAttribute("aria-label", t.start);
   qrCanvas.setAttribute("aria-label", t.qr);
   note.textContent = t.note;
+  renderDemo();
   life.setAttribute("aria-label", t.board);
   $("genicon").innerHTML = ICON.glider(16);
   $("genbox").title = t.gen;
@@ -1407,7 +1417,7 @@ function renderPost() {
   msg.textContent = postMsg ? postMsg(t) : "";
 }
 function offerPost() {                                        // called when a game ends
-  if (!rankingOn) return;
+  if (!rankingOn || demo) return;                             // (a demo is never offered to the ranking)
   postCls = boardClass; postScore = resultInfo.score; postMsg = null;
   postForm.hidden = false;
   postName.disabled = $("postGo").disabled = false;
@@ -1520,6 +1530,7 @@ function preview() {
     qrCanvas.width = qrCanvas.height = 1;
     c.fillStyle = "#fff"; c.fillRect(0, 0, 1, 1);
     renderHint();
+    if (demoWanted && startDemo()) return;                  // an empty box: the board shows the demo until the player types
     showPreview(null);
     return;
   }
@@ -1527,13 +1538,18 @@ function preview() {
   try { qr = QR.encode(bytes, 1, qrVersion()); }
   catch (e) { hintState.tooLong = QR.maxBytes(qrVersion(), 1); renderHint(); return; }
   pending = qr;
-  const q = 4, n = qr.size + q * 2;     // with quiet zone
+  demoWanted = false;                   // the player is typing: the demo has done its job
+  endDemo();
+  drawQR(qr);
+  renderHint();
+  showPreview(qr);
+}
+function drawQR(qr) {
+  const c = qrCanvas.getContext("2d"), q = 4, n = qr.size + q * 2;     // with quiet zone
   qrCanvas.width = qrCanvas.height = n;
   c.fillStyle = "#fff"; c.fillRect(0, 0, n, n); c.fillStyle = "#000";
   for (let y = 0; y < qr.size; y++) for (let x = 0; x < qr.size; x++)
     if (qr.modules[y * qr.size + x]) c.fillRect(x + q, y + q, 1, 1);
-  renderHint();
-  showPreview(qr);
 }
 
 function showPreview(qr) {
@@ -1548,12 +1564,52 @@ function showPreview(qr) {
 function start() {
   audioWake();
   if (!pending) { text.focus(); return; }
+  demoWanted = false; endDemo();
   const { cells, g } = seedFromQR(pending);
   load(cells, g);
   hasQR = true; holding = false; running = true;
   note.hidden = true;
   syncButtons();
 }
+
+/* ---- demo autoplay ---- */
+// A first-time visitor sees a game already running: DEMO_TEXT goes through the same QR encoder, Life rules, pattern
+// finder and scoring as any game (nothing is faked). It stops for good as soon as the player types or presses Skip, and
+// never touches the best score or the ranking (see finish() and offerPost()). To show a more striking text, change only
+// DEMO_TEXT (it has to fit the smallest board class: 14 bytes).
+const DEMO_TEXT = "HELLO WORLD";
+const DEMO_REPLAY_MS = 4000;                           // pause on the finished demo before it plays again
+let demo = false, demoWanted = true, demoTimer = 0;
+function renderDemo() {
+  $("demo").hidden = !demo;
+  $("demoTag").textContent = `${T().demo} · ${DEMO_TEXT}`;
+  $("demoSkip").textContent = T().demoSkip;
+}
+function startDemo() {
+  clearTimeout(demoTimer);
+  let qr;
+  try { qr = QR.encode(enc.encode(DEMO_TEXT), 1, qrVersion()); } catch (e) { demoWanted = false; return false; }
+  const { cells, g } = seedFromQR(qr);
+  demo = true;
+  load(cells, g);
+  drawQR(qr);
+  hasQR = true; holding = false; running = true;
+  note.hidden = true;
+  renderDemo();
+  syncButtons();
+  return true;
+}
+function scheduleDemoReplay() {                        // one timer at most; startDemo / endDemo cancel it
+  clearTimeout(demoTimer);
+  demoTimer = setTimeout(() => { if (demo && demoWanted && finished) startDemo(); }, DEMO_REPLAY_MS);
+}
+function endDemo() {                                   // leaves the board to the caller (preview / start load their own)
+  clearTimeout(demoTimer);
+  if (!demo) return;
+  demo = false;
+  renderDemo();
+}
+$("demoSkip").onclick = () => { demoWanted = false; endDemo(); preview(); };
 
 let last = 0, lastT = 0;
 function frame(t) {
