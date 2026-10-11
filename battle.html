@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Toad Hunt Battle</title>
+<title>QR Game of Life Battle</title>
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
-<meta name="description" content="Toad Hunt battle: two players type a text each and their QR codes play Conway's Game of Life side by side.">
+<meta name="description" content="QR Game of Life battle: two players type a text each and their QR codes play Conway's Game of Life side by side.">
 <style>
   :root { --bg:#f2f2f2; --card:#fff; --ink:#111; --sub:#8a8a8a; --line:#e2e2e2; --p1:#111; --p2:#c9c9c9; --board:#f0f0f0; }
   html { overflow-y: scroll; }   /* same width with or without a scrollbar, so the header stays put when switching modes */
@@ -129,7 +129,7 @@
 </head>
 <body>
   <header class="head">
-    <h1><img class="logo" src="logo.svg" alt="" width="24" height="24"><span id="appName">Toad Hunt</span><span id="appSub"></span></h1>
+    <h1><img class="logo" src="logo.svg" alt="" width="24" height="24"><span id="appName">QR Game of Life</span><span id="appSub"></span></h1>
     <p class="subtitle">A QR Game of Life Challenge</p>
     <nav class="modes" aria-label="Mode"><a id="modeSingle" href="index.html"></a><a id="modeBattle" href="battle.html" aria-current="page"></a></nav>
   </header>
@@ -179,7 +179,7 @@ const enc = new TextEncoder();
 /* ===================== language + pictograms ===================== */
 const I18N = {
   en: {
-    label: "EN", title: "Toad Hunt · Battle", modeSingle: "Solo", modeBattle: "Battle", modes: "Mode",
+    label: "EN", title: "QR Game of Life · Battle", modeSingle: "Solo", modeBattle: "Battle", modes: "Mode",
     player: n => `Player ${n}`, placeholder: "Type text…",
     hint: "Both players type a text, then press ▶ (or ↵ Enter)",
     needBoth: "Both players need a text first",
@@ -191,7 +191,7 @@ const I18N = {
     endLimit: g => `${g} generations`, endSettled: g => `settled at generation ${g}`, rarity: r => `Rarity ${r} / 5`,
   },
   ja: {
-    label: "JA", title: "ヒキガエルハント · 対戦", titleSub: "Toad Hunt", appName: "ヒキガエルハント", appSub: "Toad Hunt", modeSingle: "ソロ", modeBattle: "対戦", modes: "モード",
+    label: "JA", title: "QR Game of Life · 対戦", appName: "QR Game of Life", modeSingle: "ソロ", modeBattle: "対戦", modes: "モード",
     player: n => `プレイヤー${n}`, placeholder: "文字を入力…",
     hint: "2人とも文字を入力して、▶（または ↵ Enter）で開始",
     needBoth: "先に2人とも文字を入力してください",
@@ -524,7 +524,7 @@ function applyLang() {
   const t = T();
   document.documentElement.lang = lang;
   document.title = t.titleSub ? `${t.title} · ${t.titleSub}` : t.title;
-  $("appName").textContent = t.appName || "Toad Hunt";
+  $("appName").textContent = t.appName || "QR Game of Life";
   $("appSub").textContent = t.appSub || "";
   $("modeSingle").textContent = t.modeSingle; $("modeBattle").textContent = t.modeBattle;
   document.querySelector(".modes").setAttribute("aria-label", t.modes);
