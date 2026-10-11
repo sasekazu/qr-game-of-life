@@ -9,6 +9,8 @@ Type some text and its QR code plays Conway's Game of Life.
 
 **⚔ Battle (2 players, side by side): https://sasekazu.github.io/toad-hunt/battle.html**
 
+Both pages have a Solo / Battle switch under the title to move between the modes.
+
 - Type up to 14 bytes (small board) or 106 bytes (large board), then press ↵ Enter or ▶.
 - Famous patterns (glider, pulsar, …) are detected and given a rarity rank of ★1–★5.
 - Every new pattern scores points by its rank (1 / 3 / 9 / 27 / 81). A game lasts 1000 generations, or ends earlier once the board only repeats itself.

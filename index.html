@@ -16,6 +16,7 @@
 <meta name="twitter:card" content="summary">
 <style>
   :root { --bg:#f2f2f2; --card:#fff; --ink:#111; --sub:#8a8a8a; --line:#e2e2e2; }
+  html { overflow-y: scroll; }   /* same width with or without a scrollbar, so the header stays put when switching modes */
   * { box-sizing: border-box; }
   body {
     margin: 0; min-height: 100vh;
@@ -27,6 +28,11 @@
   .logo { width: 24px; height: 24px; flex: none; image-rendering: pixelated; }
   h1 #appSub:not(:empty) { font-size: 10px; font-weight: 500; letter-spacing: .18em; opacity: .65; }
   h1 { margin: 0; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: var(--sub); }
+  .modes { display: inline-flex; gap: 2px; margin-top: 10px; padding: 3px; border-radius: 999px; background: #e6e6e6; }
+  .modes a { padding: 4px 16px; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: var(--sub); text-decoration: none; }
+  .modes a:hover { color: var(--ink); }
+  .modes a[aria-current="page"] { background: var(--ink); color: #fff; }
+  .modes a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   .subtitle { margin: 2px 0 0; font-size: 11px; letter-spacing: .08em; color: var(--sub); text-align: center; }
   .card {
     width: min(100%, 640px);
@@ -204,6 +210,7 @@
   <header style="text-align:center">
     <h1><img class="logo" src="logo.svg" alt="" width="24" height="24"><span id="appName">Toad Hunt</span><span id="appSub"></span></h1>
     <p class="subtitle">A QR Game of Life Challenge</p>
+    <nav class="modes" aria-label="Mode"><a id="modeSingle" href="index.html" aria-current="page"></a><a id="modeBattle" href="battle.html"></a></nav>
   </header>
   <main class="card">
     <div class="input">
@@ -1250,7 +1257,7 @@ function detect(silent = false) {
 // English is the default (Japanese for visitors whose browser or time zone says Japan); add another language by adding an entry here (the globe button cycles through them).
 const I18N = {
   en: {
-    label: "EN",
+    label: "EN", modeSingle: "Solo", modeBattle: "Battle", modes: "Mode",
     placeholder: "Type text or a URL…", start: "Start", qr: "QR code preview",
     hint: "Press ↵ Enter or ▶ to turn the QR code into Life",
     tooLong: n => `Too long (max ${n} bytes)`,
@@ -1282,7 +1289,7 @@ const I18N = {
              figure8: "Figure eight", mwss: "Middleweight spaceship", hwss: "Heavyweight spaceship", rpent: "R-pentomino" },
   },
   ja: {
-    label: "JA", appName: "ヒキガエルハント", appSub: "Toad Hunt",
+    label: "JA", appName: "ヒキガエルハント", appSub: "Toad Hunt", modeSingle: "ソロ", modeBattle: "対戦", modes: "モード",
     placeholder: "文字やURLを入力…", start: "開始", qr: "QRコードのプレビュー",
     hint: "↵ Enter か ▶ で、QRコードがライフゲームになります",
     tooLong: n => `長すぎます（最大 ${n} バイト）`,
@@ -1440,6 +1447,8 @@ function applyLang() {
   $("appName").textContent = appName;
   $("appSub").textContent = t.appSub || "";
   document.title = t.appSub ? `${appName} · ${t.appSub}` : appName;
+  $("modeSingle").textContent = t.modeSingle; $("modeBattle").textContent = t.modeBattle;
+  document.querySelector(".modes").setAttribute("aria-label", t.modes);
   text.placeholder = t.placeholder;
   goBtn.innerHTML = ICON.play(22);
   goBtn.title = t.start;
