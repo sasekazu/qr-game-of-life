@@ -16,6 +16,7 @@
     display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 24px 12px 40px;
   }
   .logo { width: 24px; height: 24px; flex: none; image-rendering: pixelated; }
+  h1 #titleSub:not(:empty) { font-size: 10px; font-weight: 500; letter-spacing: .18em; opacity: .65; }
   h1 { margin: 0; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: var(--sub); }
 
   /* ---- the two sides ---- */
@@ -119,7 +120,7 @@
 </style>
 </head>
 <body>
-  <h1><img class="logo" src="logo.svg" alt="" width="24" height="24"><span id="title">Toad Hunt · Battle</span></h1>
+  <h1><img class="logo" src="logo.svg" alt="" width="24" height="24"><span id="title">Toad Hunt · Battle</span><span id="titleSub"></span></h1>
 
   <main class="arena" id="arena">
     <section class="panel" id="panel1"></section>
@@ -180,7 +181,7 @@ const I18N = {
     endLimit: g => `${g} generations`, endSettled: g => `settled at generation ${g}`, rarity: r => `Rarity ${r} / 5`,
   },
   ja: {
-    label: "JA", title: "Toad Hunt · 対戦",
+    label: "JA", title: "ヒキガエルハント · 対戦", titleSub: "Toad Hunt",
     player: n => `プレイヤー${n}`, placeholder: "文字を入力…",
     hint: "2人とも文字を入力して、▶（または ↵ Enter）で開始",
     needBoth: "先に2人とも文字を入力してください",
@@ -524,8 +525,9 @@ function syncControls() {
 function applyLang() {
   const t = T();
   document.documentElement.lang = lang;
-  document.title = t.title;
+  document.title = t.titleSub ? `${t.title} · ${t.titleSub}` : t.title;
   $("title").textContent = t.title;
+  $("titleSub").textContent = t.titleSub || "";
   players.forEach(p => { p.pname.textContent = t.player(p.i); p.input.placeholder = t.placeholder; p.root.querySelector(".ti").innerHTML = ICON.trophy(20); });
   $("genicon").innerHTML = ICON.glider(16); $("genbox").title = t.gen; $("genMax").textContent = ` / ${E.GAME_GENS}`;
   $("lang").innerHTML = ICON.globe(18) + `<span>${t.label}</span>`; $("lang").title = t.lang; $("lang").setAttribute("aria-label", t.lang);
