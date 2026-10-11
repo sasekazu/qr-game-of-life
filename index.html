@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Toad Hunt</title>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
 <meta name="description" content="Toad Hunt: type any text and its QR code plays Conway's Game of Life. Hunt rare patterns, score points and climb the ranking.">
 <link rel="canonical" href="https://sasekazu.github.io/toad-hunt/">
 <meta property="og:type" content="website">
@@ -22,7 +24,8 @@
     display: flex; flex-direction: column; align-items: center; gap: 16px;
     padding: 32px 16px;
   }
-  h1 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: var(--sub); }
+  .logo { width: 24px; height: 24px; flex: none; image-rendering: pixelated; }
+  h1 { margin: 0; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: var(--sub); }
   .subtitle { margin: 2px 0 0; font-size: 11px; letter-spacing: .08em; color: var(--sub); text-align: center; }
   .card {
     width: min(100%, 640px);
@@ -198,7 +201,7 @@
 </head>
 <body>
   <header style="text-align:center">
-    <h1>Toad Hunt</h1>
+    <h1><img class="logo" src="logo.svg" alt="" width="24" height="24">Toad Hunt</h1>
     <p class="subtitle">A QR Game of Life Challenge</p>
   </header>
   <main class="card">
