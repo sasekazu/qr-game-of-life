@@ -26,14 +26,12 @@
     padding: 32px 16px;
   }
   .logo { width: 24px; height: 24px; flex: none; image-rendering: pixelated; }
-  h1 #appSub:not(:empty) { font-size: 10px; font-weight: 500; letter-spacing: .18em; opacity: .65; }
   h1 { margin: 0; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: var(--sub); }
   .modes { display: inline-flex; gap: 2px; margin-top: 10px; padding: 3px; border-radius: 999px; background: #e6e6e6; }
   .modes a { padding: 4px 16px; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: var(--sub); text-decoration: none; }
   .modes a:hover { color: var(--ink); }
   .modes a[aria-current="page"] { background: var(--ink); color: #fff; }
   .modes a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-  .subtitle { margin: 2px 0 0; font-size: 11px; letter-spacing: .08em; color: var(--sub); text-align: center; }
   .card {
     width: min(100%, 640px);
     background: var(--card);
@@ -205,8 +203,7 @@
 </head>
 <body>
   <header style="text-align:center">
-    <h1><img class="logo" src="logo.svg" alt="" width="24" height="24"><span id="appName">QR Game of Life</span><span id="appSub"></span></h1>
-    <p class="subtitle">A QR Game of Life Challenge</p>
+    <h1><img class="logo" src="logo.svg" alt="" width="24" height="24"><span id="appName">QR Game of Life</span></h1>
     <nav class="modes" aria-label="Mode"><a id="modeSingle" href="index.html" aria-current="page"></a><a id="modeBattle" href="battle.html"></a></nav>
   </header>
   <main class="card">
@@ -1424,8 +1421,7 @@ function applyLang() {
   document.documentElement.lang = lang;
   const appName = t.appName || "QR Game of Life";
   $("appName").textContent = appName;
-  $("appSub").textContent = t.appSub || "";
-  document.title = t.appSub ? `${appName} · ${t.appSub}` : appName;
+  document.title = appName;
   $("modeSingle").textContent = t.modeSingle; $("modeBattle").textContent = t.modeBattle;
   document.querySelector(".modes").setAttribute("aria-label", t.modes);
   text.placeholder = t.placeholder;

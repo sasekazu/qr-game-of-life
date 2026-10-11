@@ -1,7 +1,5 @@
 # QR Game of Life
 
-*A QR Game of Life Challenge*
-
 Type some text and its QR code plays Conway's Game of Life.
 文字を入力すると、そのQRコードがライフゲームになります。
 
