@@ -1,4 +1,4 @@
-/* QR Life engine: the QR encoder, the pattern table with its ranks, the pattern finder and the scoring rules, as one
+/* Toad Hunt engine: the QR encoder, the pattern table with its ranks, the pattern finder and the scoring rules, as one
  * dependency-free script (no DOM). battle.html uses it; the rules are the same as in index.html (the same text on the
  * same board class scores the same). Loaded as a classic script so it also works when a page is opened from disk.
  *

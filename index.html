@@ -3,7 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QR Life</title>
+<title>Toad Hunt</title>
+<meta name="description" content="Toad Hunt: type any text and its QR code plays Conway's Game of Life. Hunt rare patterns, score points and climb the ranking.">
+<link rel="canonical" href="https://sasekazu.github.io/toad-hunt/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Toad Hunt">
+<meta property="og:title" content="Toad Hunt: A QR Game of Life Challenge">
+<meta property="og:description" content="Toad Hunt: type any text and its QR code plays Conway's Game of Life. Hunt rare patterns, score points and climb the ranking.">
+<meta property="og:url" content="https://sasekazu.github.io/toad-hunt/">
+<meta name="twitter:card" content="summary">
 <style>
   :root { --bg:#f2f2f2; --card:#fff; --ink:#111; --sub:#8a8a8a; --line:#e2e2e2; }
   * { box-sizing: border-box; }
@@ -15,6 +23,7 @@
     padding: 32px 16px;
   }
   h1 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: var(--sub); }
+  .subtitle { margin: 2px 0 0; font-size: 11px; letter-spacing: .08em; color: var(--sub); text-align: center; }
   .card {
     width: min(100%, 640px);
     background: var(--card);
@@ -188,7 +197,10 @@
 </style>
 </head>
 <body>
-  <h1>QR Life</h1>
+  <header style="text-align:center">
+    <h1>Toad Hunt</h1>
+    <p class="subtitle">A QR Game of Life Challenge</p>
+  </header>
   <main class="card">
     <div class="input">
       <input id="text" type="text" placeholder="Type text or a URL…" spellcheck="false" autocomplete="off" enterkeyhint="go" autofocus>
@@ -1045,7 +1057,7 @@ function renderResult() {
 // The post is built from the score, the board class, the best pattern and a constant URL ONLY. The game is deterministic
 // (same text -> same score), so the input text, the QR code and anything derived from them are never shared, and the
 // link is the plain top page (no query, no hash). Sharing never touches the ranking (see offerPost()).
-const SHARE_URL = "https://sasekazu.github.io/qrlife/";
+const SHARE_URL = "https://sasekazu.github.io/toad-hunt/";
 const SHARE_PATTERNS = 3;                             // kinds listed at least (more only when the rarest rank has more kinds)
 function topPatterns() {                              // [{ id, count }]: every kind of the rarest rank, then the next rarest up to SHARE_PATTERNS
   const all = Object.keys(found).map(id => ({ id, rank: rankOf(id), count: found[id] }))
@@ -1060,7 +1072,7 @@ function shareText() {
     t.score(r.score.toLocaleString("en-US"), r.cls === "small" ? t.small : t.large),
     ...r.top.map(p => `${patName(p.id)}${p.count > 1 ? ` × ${p.count}` : ""}`),
     t.cta,
-    "#QRLife",
+    "#ToadHunt",
     SHARE_URL,
   ].join("\n");
 }
@@ -1250,7 +1262,7 @@ const I18N = {
     classSmall: "Small board", classLarge: "Large board", upTo: n => `up to ${n} bytes`,
     share: {
       x: "Share on X", copy: "Copy", copied: "Copied!", copyFail: "Copy failed",
-      score: (n, board) => `I scored ${n} on QR Life (${board})!`, small: "Small Board", large: "Large Board", cta: "How high can you score?",
+      score: (n, board) => `I scored ${n} on Toad Hunt (${board})!`, small: "Small Board", large: "Large Board", cta: "How high can you score?",
     },
     rank: {
       title: "Ranking · Top 10", btn: "Ranking", namePh: "Your name", post: "Post", refresh: "Refresh", loading: "Loading…",
@@ -1282,7 +1294,7 @@ const I18N = {
     classSmall: "小さい盤面", classLarge: "大きい盤面", upTo: n => `最大 ${n} バイト`,
     share: {
       x: "Xで共有", copy: "コピー", copied: "コピーしました", copyFail: "コピー失敗",
-      score: (n, board) => `QR Life (${board})で${n}点を獲得！`, small: "Small Board", large: "Large Board", cta: "あなたは何点取れる？",
+      score: (n, board) => `Toad Hunt (${board})で${n}点を獲得！`, small: "Small Board", large: "Large Board", cta: "あなたは何点取れる？",
     },
     rank: {
       title: "ランキング · 上位10人", btn: "ランキング", namePh: "名前", post: "登録", refresh: "更新", loading: "読み込み中…",
