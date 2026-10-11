@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Toad Hunt</title>
+<title>QR Game of Life</title>
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
-<meta name="description" content="Toad Hunt: type any text and its QR code plays Conway's Game of Life. Hunt rare patterns, score points and climb the ranking.">
-<link rel="canonical" href="https://sasekazu.github.io/toad-hunt/">
+<meta name="description" content="QR Game of Life: type any text and its QR code plays Conway's Game of Life. Hunt rare patterns, score points and climb the ranking.">
+<link rel="canonical" href="https://sasekazu.github.io/qr-game-of-life/">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="Toad Hunt">
-<meta property="og:title" content="Toad Hunt: A QR Game of Life Challenge">
-<meta property="og:description" content="Toad Hunt: type any text and its QR code plays Conway's Game of Life. Hunt rare patterns, score points and climb the ranking.">
-<meta property="og:url" content="https://sasekazu.github.io/toad-hunt/">
+<meta property="og:site_name" content="QR Game of Life">
+<meta property="og:title" content="QR Game of Life: A Conway's Game of Life Challenge">
+<meta property="og:description" content="QR Game of Life: type any text and its QR code plays Conway's Game of Life. Hunt rare patterns, score points and climb the ranking.">
+<meta property="og:url" content="https://sasekazu.github.io/qr-game-of-life/">
 <meta name="twitter:card" content="summary">
 <style>
   :root { --bg:#f2f2f2; --card:#fff; --ink:#111; --sub:#8a8a8a; --line:#e2e2e2; }
@@ -205,7 +205,7 @@
 </head>
 <body>
   <header style="text-align:center">
-    <h1><img class="logo" src="logo.svg" alt="" width="24" height="24"><span id="appName">Toad Hunt</span><span id="appSub"></span></h1>
+    <h1><img class="logo" src="logo.svg" alt="" width="24" height="24"><span id="appName">QR Game of Life</span><span id="appSub"></span></h1>
     <p class="subtitle">A QR Game of Life Challenge</p>
     <nav class="modes" aria-label="Mode"><a id="modeSingle" href="index.html" aria-current="page"></a><a id="modeBattle" href="battle.html"></a></nav>
   </header>
@@ -1061,7 +1061,7 @@ function renderResult() {
 // The post is built from the score, the board class, the best pattern and a constant URL ONLY. The game is deterministic
 // (same text -> same score), so the input text, the QR code and anything derived from them are never shared, and the
 // link is the plain top page (no query, no hash). Sharing never touches the ranking (see offerPost()).
-const SHARE_URL = "https://sasekazu.github.io/toad-hunt/";
+const SHARE_URL = "https://sasekazu.github.io/qr-game-of-life/";
 const SHARE_PATTERNS = 3;                             // kinds listed at least (more only when the rarest rank has more kinds)
 function topPatterns() {                              // [{ id, count }]: every kind of the rarest rank, then the next rarest up to SHARE_PATTERNS
   const all = Object.keys(found).map(id => ({ id, rank: rankOf(id), count: found[id] }))
@@ -1076,7 +1076,7 @@ function shareText() {
     t.score(r.score.toLocaleString("en-US")),
     ...r.top.map(p => `${patName(p.id)}${p.count > 1 ? ` × ${p.count}` : ""}`),
     t.cta,
-    "#ToadHunt",
+    "#QRGameOfLife",
     SHARE_URL,
   ].join("\n");
 }
@@ -1267,7 +1267,7 @@ const I18N = {
     endLimit: n => `${n} generations played`, endSettled: g => `Nothing new can happen: the board repeats itself (generation ${g})`,
     share: {
       x: "Share on X", copy: "Copy", copied: "Copied!", copyFail: "Copy failed",
-      score: n => `I scored ${n} on Toad Hunt!`, cta: "How high can you score?",
+      score: n => `I scored ${n} on QR Game of Life!`, cta: "How high can you score?",
     },
     rank: {
       title: "Ranking · Top 10", btn: "Ranking", namePh: "Your name", post: "Post", refresh: "Refresh", loading: "Loading…",
@@ -1283,7 +1283,7 @@ const I18N = {
              figure8: "Figure eight", mwss: "Middleweight spaceship", hwss: "Heavyweight spaceship", rpent: "R-pentomino" },
   },
   ja: {
-    label: "JA", appName: "ヒキガエルハント", appSub: "Toad Hunt", modeSingle: "ソロ", modeBattle: "対戦", modes: "モード",
+    label: "JA", appName: "QR Game of Life", modeSingle: "ソロ", modeBattle: "対戦", modes: "モード",
     placeholder: "文字やURLを入力…", start: "開始", qr: "QRコードのプレビュー",
     hint: "↵ Enter か ▶ で、QRコードがライフゲームになります",
     tooLong: n => `長すぎます（最大 ${n} バイト）`,
@@ -1300,7 +1300,7 @@ const I18N = {
     endLimit: n => `${n}世代まで到達`, endSettled: g => `${g}世代で同じ動きの繰り返しになりました（もう新しいパターンは出ません）`,
     share: {
       x: "Xで共有", copy: "コピー", copied: "コピーしました", copyFail: "コピー失敗",
-      score: n => `ヒキガエルハント Toad Huntで${n}点を獲得！`, cta: "あなたは何点取れる？",
+      score: n => `QR Game of Lifeで${n}点を獲得！`, cta: "あなたは何点取れる？",
     },
     rank: {
       title: "ランキング · 上位10人", btn: "ランキング", namePh: "名前", post: "登録", refresh: "更新", loading: "読み込み中…",
@@ -1422,7 +1422,7 @@ function renderGuide() {
 function applyLang() {
   const t = T();
   document.documentElement.lang = lang;
-  const appName = t.appName || "Toad Hunt";
+  const appName = t.appName || "QR Game of Life";
   $("appName").textContent = appName;
   $("appSub").textContent = t.appSub || "";
   document.title = t.appSub ? `${appName} · ${t.appSub}` : appName;

@@ -1,4 +1,4 @@
-// Generates the Toad Hunt logo from the 8x8 cell map below: logo.svg and favicon-32.png.
+// Generates the QR Game of Life logo from the 8x8 cell map below: logo.svg and favicon-32.png.
 // Edit LOGO / PALETTE, then run:   node tools/make-logo.cjs
 //
 // The shape is the Toad-like cell layout (5 rows, centred in an 8x8 grid):
@@ -24,7 +24,7 @@ LOGO.forEach((row, y) => [...row].forEach((ch, x) => { if (PALETTE[ch]) cells.pu
 // SVG: one rect per cell, grouped by colour
 const byColour = {};
 cells.forEach(({ x, y, c }) => (byColour[c] = byColour[c] || []).push(`<rect x="${x}" y="${y}" width="1" height="1"/>`));
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" width="64" height="64" shape-rendering="crispEdges" role="img" aria-label="Toad Hunt">\n` +
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" width="64" height="64" shape-rendering="crispEdges" role="img" aria-label="QR Game of Life">\n` +
   Object.entries(byColour).map(([c, r]) => `<g fill="${c}">${r.join("")}</g>`).join("\n") + `\n</svg>\n`;
 fs.writeFileSync(path.join(root, "logo.svg"), svg);
 
