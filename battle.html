@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QR Life Battle</title>
+<title>Toad Hunt Battle</title>
+<meta name="description" content="Toad Hunt battle: two players type a text each and their QR codes play Conway's Game of Life side by side.">
 <style>
   :root { --bg:#f2f2f2; --card:#fff; --ink:#111; --sub:#8a8a8a; --line:#e2e2e2; --p1:#111; --p2:#c9c9c9; --board:#f0f0f0; }
   * { box-sizing: border-box; }
@@ -115,7 +116,7 @@
 </style>
 </head>
 <body>
-  <h1 id="title">QR Life · Battle</h1>
+  <h1 id="title">Toad Hunt · Battle</h1>
 
   <main class="arena" id="arena">
     <section class="panel" id="panel1"></section>
@@ -163,7 +164,7 @@ const enc = new TextEncoder();
 /* ===================== language + pictograms ===================== */
 const I18N = {
   en: {
-    label: "EN", title: "QR Life · Battle",
+    label: "EN", title: "Toad Hunt · Battle",
     player: n => `Player ${n}`, placeholder: "Type text…",
     hint: "Both players type a text, then press ▶ (or ↵ Enter)",
     needBoth: "Both players need a text first",
@@ -176,7 +177,7 @@ const I18N = {
     endLimit: g => `${g} generations`, endSettled: g => `settled at generation ${g}`, rarity: r => `Rarity ${r} / 5`,
   },
   ja: {
-    label: "JA", title: "QR Life · 対戦",
+    label: "JA", title: "Toad Hunt · 対戦",
     player: n => `プレイヤー${n}`, placeholder: "文字を入力…",
     hint: "2人とも文字を入力して、▶（または ↵ Enter）で開始",
     needBoth: "先に2人とも文字を入力してください",
